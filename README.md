@@ -5,7 +5,7 @@ This project provides an integration between Godot and the Model Context Protoco
 ## Project Structure
 
 - `server/`: The TypeScript MCP server implementation
-- `godot-plugin/`: The Godot editor plugin
+- `addons/mcp_integration/`: The Godot editor plugin (ready to use in this project)
 
 ## Setting Up the MCP Server
 
@@ -19,29 +19,30 @@ This project provides an integration between Godot and the Model Context Protoco
    npm install
    ```
 
-3. Build and run the server:
+3. Build the server:
    ```bash
-   npm run dev
+   npm run build
    ```
 
-   This will start the server on http://localhost:3000.
-
-## Setting Up the Godot Plugin
-
-1. Copy the plugin to your Godot project:
+4. When used with Claude Desktop, you don't need to manually run the server - it will be started automatically. For manual testing, you can run:
    ```bash
-   cp -r /Users/Shared/Godot/godot-mcp/godot-plugin/addons/mcp_integration /path/to/your-godot-project/addons/
+   npm run start     # For HTTP mode
+   npm run stdio     # For stdio mode
    ```
 
-2. Enable the plugin in Godot:
-   - Open your Godot project
-   - Go to Project > Project Settings > Plugins
-   - Enable the "MCP Script Integration" plugin
+## Using the Godot Plugin
+
+The plugin is already installed in the correct location in this project. To use it:
+
+1. Open this Godot project
+2. Go to Project > Project Settings > Plugins
+3. Enable the "MCP Script Integration" plugin
 
 ## Connecting to Claude Desktop
 
-1. Configure Claude Desktop to connect to the MCP server:
-   - Create or edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Configure Claude Desktop to connect to the MCP server:
+
+1. Create or edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
    ```json
    {
      "mcpServers": {
@@ -49,7 +50,10 @@ This project provides an integration between Godot and the Model Context Protoco
          "command": "node",
          "args": [
            "/Users/Shared/Godot/godot-mcp/server/dist/index.js"
-         ]
+         ],
+         "env": {
+           "MCP_TRANSPORT": "stdio"
+         }
        }
      }
    }
@@ -59,8 +63,8 @@ This project provides an integration between Godot and the Model Context Protoco
 
 ## Using the Integration
 
-1. Start the MCP server if running separately
-2. Start Godot and open your project
+1. Start Godot and open this project
+2. Enable the plugin in Project Settings if not already enabled
 3. Edit scripts in Godot
 4. In Claude Desktop, you can now access the current script through MCP
 
@@ -76,7 +80,21 @@ This project provides an integration between Godot and the Model Context Protoco
 
 ## Troubleshooting
 
+### EADDRINUSE Error
+
+If you see an error like `Error: listen EADDRINUSE: address already in use :::3000` in the logs:
+
+1. This is normal when Claude Desktop launches two instances of the server
+2. The server will continue to function properly using stdio communication
+3. Only the HTTP server portion will fail, which isn't needed for Claude Desktop
+
+If you need to run the HTTP server manually:
+
+1. Make sure no other services are using port 3000
+2. Alternatively, specify a different port: `PORT=3001 npm run start`
+
+### Other Common Issues
+
 - If the plugin isn't seeing script changes, try restarting Godot
 - Check the Godot console for any error messages from the plugin
-- Make sure the server is running before opening Godot
 - Check the server's console output for any connection issues

@@ -4,7 +4,10 @@
       "command": "node",
       "args": [
         "/Users/Shared/Godot/godot-mcp/server/dist/index.js"
-      ]
+      ],
+      "env": {
+        "MCP_TRANSPORT": "stdio"
+      }
     }
   }
 }

@@ -12,8 +12,6 @@ let currentScript = {
     content: "",
     lastUpdated: new Date(),
 };
-// Map to store active SSE transports
-const sseTransports = new Map();
 // Create an MCP server
 const server = new McpServer({
     name: "godot-script-server",
@@ -69,7 +67,7 @@ server.tool("list-project-scripts", "Lists all script files in a project directo
             content: [
                 {
                     type: "text",
-                    text: `Error listing scripts: ${error instanceof Error ? error.message : String(error)}`,
+                    text: `Error listing scripts: ${error.message || String(error)}`,
                 },
             ],
             isError: true,
@@ -96,7 +94,7 @@ server.tool("read-script", "Reads the content of a specific script", {
             content: [
                 {
                     type: "text",
-                    text: `Error reading script: ${error instanceof Error ? error.message : String(error)}`,
+                    text: `Error reading script: ${error.message || String(error)}`,
                 },
             ],
             isError: true,
@@ -126,64 +124,84 @@ async function findScripts(dir) {
     await scanDirectory(dir);
     return scriptFiles;
 }
-// Create Express app for HTTP communication with Godot
-const app = express();
-app.use(cors());
-app.use(express.json());
-// Endpoint for Godot to update the current script
-app.post("/godot/current-script", (req, res) => {
-    const { path: scriptPath, content } = req.body;
-    currentScript = {
-        path: scriptPath,
-        content,
-        lastUpdated: new Date(),
-    };
-    res.json({ success: true });
-});
-// Endpoint for Godot to get the currently active script
-app.get("/godot/current-script", (req, res) => {
-    res.json(currentScript);
-});
-// MCP SSE endpoint setup for HTTP transport
-app.get("/mcp/sse", (req, res) => {
-    const transport = new SSEServerTransport("/mcp/message", res);
-    // Store the transport with its session ID
-    sseTransports.set(transport.sessionId, transport);
-    // Remove the transport when the connection is closed
-    res.on("close", () => {
-        sseTransports.delete(transport.sessionId);
-        console.error(`SSE connection closed: ${transport.sessionId}`);
-    });
-    server.connect(transport).catch(console.error);
-    console.error(`New SSE connection: ${transport.sessionId}`);
-});
-app.post("/mcp/message", (req, res) => {
-    const sessionId = req.query.sessionId;
-    const transport = sseTransports.get(sessionId);
-    if (transport) {
-        transport.handlePostMessage(req, res);
+// Create a transport registry to store active transports
+const activeTransports = new Map();
+// Extend the SSEServerTransport class with our additional functionality
+class ExtendedSSEServerTransport extends SSEServerTransport {
+    initialize(req) {
+        const sessionId = req.query.sessionId ||
+            Math.random().toString(36).substring(2, 15);
+        activeTransports.set(sessionId, this);
+        return sessionId;
     }
-    else {
-        res
-            .status(400)
-            .json({ error: "No active transport found for this session" });
+    static getTransportForRequest(req) {
+        const sessionId = req.query.sessionId;
+        return sessionId ? activeTransports.get(sessionId) : undefined;
     }
-});
+}
 // Main function to start everything
 async function main() {
+    // Detect if running in stdio mode (which is how Claude Desktop runs it)
+    const isStdioMode = process.argv.includes("--stdio") ||
+        !process.stdout.isTTY ||
+        process.env.MCP_TRANSPORT === "stdio";
     try {
-        // For command-line access via stdio
-        if (process.argv.includes("--stdio")) {
+        if (isStdioMode) {
+            // When running in stdio mode, only use stdio transport
+            console.error("Godot MCP Server running in stdio mode");
             const stdioTransport = new StdioServerTransport();
             await server.connect(stdioTransport);
-            console.error("Godot MCP Server running on stdio transport");
         }
         else {
-            // Start HTTP server
-            const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-            app.listen(port, () => {
-                console.error(`Godot MCP Server running on http://localhost:${port}`);
+            // When running as standalone, use HTTP server
+            console.error("Godot MCP Server running in HTTP mode");
+            // Create Express app for HTTP communication
+            const app = express();
+            app.use(cors());
+            app.use(express.json());
+            // Endpoint for Godot to update the current script
+            app.post("/godot/current-script", (req, res) => {
+                const { path: scriptPath, content } = req.body;
+                currentScript = {
+                    path: scriptPath,
+                    content,
+                    lastUpdated: new Date(),
+                };
+                res.json({ success: true });
             });
+            // Endpoint for Godot to get the currently active script
+            app.get("/godot/current-script", (req, res) => {
+                res.json(currentScript);
+            });
+            // MCP SSE endpoint setup for HTTP transport
+            app.get("/mcp/sse", (req, res) => {
+                const transport = new ExtendedSSEServerTransport("/mcp/message", res);
+                const sessionId = transport.initialize(req);
+                res.setHeader("X-Session-ID", sessionId);
+                server.connect(transport).catch(console.error);
+            });
+            app.post("/mcp/message", (req, res) => {
+                const transport = ExtendedSSEServerTransport.getTransportForRequest(req);
+                if (transport) {
+                    transport.handlePostMessage(req, res);
+                }
+                else {
+                    res
+                        .status(400)
+                        .json({ error: "No active transport found for this session" });
+                }
+            });
+            // Use a different port if specified via environment
+            const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+            try {
+                app.listen(port, () => {
+                    console.error(`Godot MCP Server running on http://localhost:${port}`);
+                });
+            }
+            catch (error) {
+                console.error(`Failed to start HTTP server on port ${port}:`, error);
+                console.error("The server will continue to work in stdio mode only.");
+            }
         }
     }
     catch (error) {
