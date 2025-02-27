@@ -98,3 +98,7 @@ If you need to run the HTTP server manually:
 - If the plugin isn't seeing script changes, try restarting Godot
 - Check the Godot console for any error messages from the plugin
 - Check the server's console output for any connection issues
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
