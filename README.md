@@ -2,6 +2,14 @@
 
 This project provides an integration between Godot and the Model Context Protocol (MCP). It allows you to access the currently open script in the Godot editor via an MCP server, which can then be used by Claude or other MCP clients.
 
+## Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ee0pdt/Godot-MCP.git
+   cd Godot-MCP
+   ```
+
 ## Project Structure
 
 - `server/`: The TypeScript MCP server implementation
@@ -11,7 +19,7 @@ This project provides an integration between Godot and the Model Context Protoco
 
 1. Navigate to the server directory:
    ```bash
-   cd /Users/Shared/Godot/godot-mcp/server
+   cd server
    ```
 
 2. Install dependencies:
@@ -49,7 +57,7 @@ Configure Claude Desktop to connect to the MCP server:
        "godot-script-server": {
          "command": "node",
          "args": [
-           "/Users/Shared/Godot/godot-mcp/server/dist/index.js"
+           "[PATH_TO_YOUR_PROJECT]/server/dist/index.js"
          ],
          "env": {
            "MCP_TRANSPORT": "stdio"
@@ -58,15 +66,35 @@ Configure Claude Desktop to connect to the MCP server:
      }
    }
    ```
+   > **Note:** Replace `[PATH_TO_YOUR_PROJECT]` with the absolute path to where you have this project stored.
 
 2. Restart Claude Desktop
 
-## Using the Integration
+## Using MCP with Claude
 
-1. Start Godot and open this project
-2. Enable the plugin in Project Settings if not already enabled
-3. Edit scripts in Godot
-4. In Claude Desktop, you can now access the current script through MCP
+Once configured, you can use commands in Claude to interact with your Godot scripts:
+
+1. **View the current script**:
+   ```
+   @mcp godot-script-server read godot://script/current
+   ```
+
+2. **Request script updates** (useful if you've made changes):
+   ```
+   @mcp godot-script-server run update-current-script
+   ```
+
+3. **List all scripts in your project**:
+   ```
+   @mcp godot-script-server run list-project-scripts
+   ```
+
+4. **Get help with your code**:
+   ```
+   @mcp godot-script-server read godot://script/current
+   
+   Can you help me optimize this code? I'm particularly concerned about the performance in the _process function.
+   ```
 
 ## Available MCP Resources and Tools
 
