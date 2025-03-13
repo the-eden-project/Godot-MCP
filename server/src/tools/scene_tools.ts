@@ -1,10 +1,28 @@
 import { z } from 'zod';
 import { getGodotConnection } from '../utils/godot_connection';
+import { MCPTool, CommandResult } from '../utils/types';
+
+/**
+ * Type definitions for scene tool parameters
+ */
+interface SaveSceneParams {
+  path?: string;
+}
+
+interface OpenSceneParams {
+  path: string;
+}
+
+interface CreateResourceParams {
+  resource_type: string;
+  resource_path: string;
+  properties?: Record<string, any>;
+}
 
 /**
  * Definition for scene tools - operations that manipulate Godot scenes
  */
-export const sceneTools = [
+export const sceneTools: MCPTool[] = [
   {
     name: 'save_scene',
     description: 'Save the current scene to disk',
@@ -12,14 +30,14 @@ export const sceneTools = [
       path: z.string().optional()
         .describe('Path where the scene will be saved (e.g. "res://scenes/main.tscn"). If not provided, uses current scene path.'),
     }),
-    execute: async ({ path }) => {
+    execute: async ({ path }: SaveSceneParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('save_scene', { path });
+        const result = await godot.sendCommand<CommandResult>('save_scene', { path });
         return `Saved scene to ${result.scene_path}`;
       } catch (error) {
-        throw new Error(`Failed to save scene: ${error.message}`);
+        throw new Error(`Failed to save scene: ${(error as Error).message}`);
       }
     },
   },
@@ -31,14 +49,14 @@ export const sceneTools = [
       path: z.string()
         .describe('Path to the scene file to open (e.g. "res://scenes/main.tscn")'),
     }),
-    execute: async ({ path }) => {
+    execute: async ({ path }: OpenSceneParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('open_scene', { path });
+        const result = await godot.sendCommand<CommandResult>('open_scene', { path });
         return `Opened scene at ${result.scene_path}`;
       } catch (error) {
-        throw new Error(`Failed to open scene: ${error.message}`);
+        throw new Error(`Failed to open scene: ${(error as Error).message}`);
       }
     },
   },
@@ -47,15 +65,15 @@ export const sceneTools = [
     name: 'get_current_scene',
     description: 'Get information about the currently open scene',
     parameters: z.object({}),
-    execute: async () => {
+    execute: async (): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('get_current_scene', {});
+        const result = await godot.sendCommand<CommandResult>('get_current_scene', {});
         
         return `Current scene: ${result.scene_path}\nRoot node: ${result.root_node_name} (${result.root_node_type})`;
       } catch (error) {
-        throw new Error(`Failed to get current scene: ${error.message}`);
+        throw new Error(`Failed to get current scene: ${(error as Error).message}`);
       }
     },
   },
@@ -64,11 +82,11 @@ export const sceneTools = [
     name: 'get_project_info',
     description: 'Get information about the current Godot project',
     parameters: z.object({}),
-    execute: async () => {
+    execute: async (): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('get_project_info', {});
+        const result = await godot.sendCommand<CommandResult>('get_project_info', {});
         
         const godotVersion = `${result.godot_version.major}.${result.godot_version.minor}.${result.godot_version.patch}`;
         
@@ -84,7 +102,7 @@ export const sceneTools = [
         
         return output;
       } catch (error) {
-        throw new Error(`Failed to get project info: ${error.message}`);
+        throw new Error(`Failed to get project info: ${(error as Error).message}`);
       }
     },
   },
@@ -100,11 +118,11 @@ export const sceneTools = [
       properties: z.record(z.any()).optional()
         .describe('Dictionary of property values to set on the resource'),
     }),
-    execute: async ({ resource_type, resource_path, properties = {} }) => {
+    execute: async ({ resource_type, resource_path, properties = {} }: CreateResourceParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('create_resource', {
+        const result = await godot.sendCommand<CommandResult>('create_resource', {
           resource_type,
           resource_path,
           properties,
@@ -112,7 +130,7 @@ export const sceneTools = [
         
         return `Created ${resource_type} resource at ${result.resource_path}`;
       } catch (error) {
-        throw new Error(`Failed to create resource: ${error.message}`);
+        throw new Error(`Failed to create resource: ${(error as Error).message}`);
       }
     },
   },

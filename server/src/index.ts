@@ -27,7 +27,8 @@ async function main() {
     await godot.connect();
     console.log('Successfully connected to Godot WebSocket server');
   } catch (error) {
-    console.warn(`Could not connect to Godot: ${error.message}`);
+    const err = error as Error;
+    console.warn(`Could not connect to Godot: ${err.message}`);
     console.warn('Will retry connection when commands are executed');
   }
 

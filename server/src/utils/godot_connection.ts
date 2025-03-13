@@ -86,8 +86,9 @@ export class GodotConnection {
       });
       
       this.ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-        reject(error);
+        const err = error as Error;
+        console.error('WebSocket error:', err);
+        reject(err);
       });
       
       this.ws.on('close', () => {
@@ -122,7 +123,7 @@ export class GodotConnection {
       try {
         await this.connect();
       } catch (error) {
-        throw new Error(`Failed to connect: ${error.message}`);
+        throw new Error(`Failed to connect: ${(error as Error).message}`);
       }
     }
     

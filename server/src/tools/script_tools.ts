@@ -1,10 +1,39 @@
 import { z } from 'zod';
 import { getGodotConnection } from '../utils/godot_connection';
+import { MCPTool, CommandResult } from '../utils/types';
+
+/**
+ * Type definitions for script tool parameters
+ */
+interface CreateScriptParams {
+  script_path: string;
+  content: string;
+  node_path?: string;
+}
+
+interface EditScriptParams {
+  script_path: string;
+  content: string;
+}
+
+interface GetScriptParams {
+  script_path?: string;
+  node_path?: string;
+}
+
+interface CreateScriptTemplateParams {
+  class_name?: string;
+  extends_type: string;
+  include_ready: boolean;
+  include_process: boolean;
+  include_input: boolean;
+  include_physics: boolean;
+}
 
 /**
  * Definition for script tools - operations that manipulate GDScript files
  */
-export const scriptTools = [
+export const scriptTools: MCPTool[] = [
   {
     name: 'create_script',
     description: 'Create a new GDScript file in the project',
@@ -16,11 +45,11 @@ export const scriptTools = [
       node_path: z.string().optional()
         .describe('Path to a node to attach the script to (optional)'),
     }),
-    execute: async ({ script_path, content, node_path }) => {
+    execute: async ({ script_path, content, node_path }: CreateScriptParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('create_script', {
+        const result = await godot.sendCommand<CommandResult>('create_script', {
           script_path,
           content,
           node_path,
@@ -32,7 +61,7 @@ export const scriptTools = [
         
         return `Created script at ${result.script_path}${attachMessage}`;
       } catch (error) {
-        throw new Error(`Failed to create script: ${error.message}`);
+        throw new Error(`Failed to create script: ${(error as Error).message}`);
       }
     },
   },
@@ -46,7 +75,7 @@ export const scriptTools = [
       content: z.string()
         .describe('New content of the script'),
     }),
-    execute: async ({ script_path, content }) => {
+    execute: async ({ script_path, content }: EditScriptParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
@@ -57,7 +86,7 @@ export const scriptTools = [
         
         return `Updated script at ${script_path}`;
       } catch (error) {
-        throw new Error(`Failed to edit script: ${error.message}`);
+        throw new Error(`Failed to edit script: ${(error as Error).message}`);
       }
     },
   },
@@ -73,18 +102,18 @@ export const scriptTools = [
     }).refine(data => data.script_path !== undefined || data.node_path !== undefined, {
       message: "Either script_path or node_path must be provided",
     }),
-    execute: async ({ script_path, node_path }) => {
+    execute: async ({ script_path, node_path }: GetScriptParams): Promise<string> => {
       const godot = getGodotConnection();
       
       try {
-        const result = await godot.sendCommand('get_script', {
+        const result = await godot.sendCommand<CommandResult>('get_script', {
           script_path,
           node_path,
         });
         
         return `Script at ${result.script_path}:\n\n\`\`\`gdscript\n${result.content}\n\`\`\``;
       } catch (error) {
-        throw new Error(`Failed to get script: ${error.message}`);
+        throw new Error(`Failed to get script: ${(error as Error).message}`);
       }
     },
   },
@@ -106,7 +135,14 @@ export const scriptTools = [
       include_physics: z.boolean().default(false)
         .describe('Whether to include the _physics_process() function'),
     }),
-    execute: async ({ class_name, extends_type, include_ready, include_process, include_input, include_physics }) => {
+    execute: async ({ 
+      class_name, 
+      extends_type, 
+      include_ready, 
+      include_process, 
+      include_input, 
+      include_physics 
+    }: CreateScriptTemplateParams): Promise<string> => {
       // Generate the template locally without needing to call Godot
       let template = '';
       
