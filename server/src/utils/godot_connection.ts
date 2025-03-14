@@ -36,10 +36,14 @@ export class GodotConnection {
    * Creates a new Godot connection
    * @param url WebSocket URL for the Godot server
    * @param timeout Command timeout in ms
+   * @param maxRetries Maximum number of connection retries
+   * @param retryDelay Delay between retries in ms
    */
   constructor(
     private url: string = 'ws://localhost:9080',
-    private timeout: number = 10000
+    private timeout: number = 20000,
+    private maxRetries: number = 3,
+    private retryDelay: number = 2000
   ) {}
   
   /**
@@ -48,68 +52,95 @@ export class GodotConnection {
   async connect(): Promise<void> {
     if (this.connected) return;
     
-    return new Promise<void>((resolve, reject) => {
-      console.log(`Connecting to Godot WebSocket server at ${this.url}...`);
-      
-      this.ws = new WebSocket(this.url);
-      
-      this.ws.on('open', () => {
-        this.connected = true;
-        console.log('Connected to Godot WebSocket server');
-        resolve();
-      });
-      
-      this.ws.on('message', (data: Buffer) => {
-        try {
-          const response: GodotResponse = JSON.parse(data.toString());
-          console.log('Received response:', response);
-          
-          // Handle command responses
-          if ('commandId' in response) {
-            const commandId = response.commandId as string;
-            const pendingCommand = this.commandQueue.get(commandId);
+    let retries = 0;
+    
+    const tryConnect = (): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        console.log(`Connecting to Godot WebSocket server at ${this.url}... (Attempt ${retries + 1}/${this.maxRetries + 1})`);
+        
+        this.ws = new WebSocket(this.url);
+        
+        this.ws.on('open', () => {
+          this.connected = true;
+          console.log('Connected to Godot WebSocket server');
+          resolve();
+        });
+        
+        this.ws.on('message', (data: Buffer) => {
+          try {
+            const response: GodotResponse = JSON.parse(data.toString());
+            console.log('Received response:', response);
             
-            if (pendingCommand) {
-              clearTimeout(pendingCommand.timeout);
-              this.commandQueue.delete(commandId);
+            // Handle command responses
+            if ('commandId' in response) {
+              const commandId = response.commandId as string;
+              const pendingCommand = this.commandQueue.get(commandId);
               
-              if (response.status === 'success') {
-                pendingCommand.resolve(response.result);
-              } else {
-                pendingCommand.reject(new Error(response.message || 'Unknown error'));
+              if (pendingCommand) {
+                clearTimeout(pendingCommand.timeout);
+                this.commandQueue.delete(commandId);
+                
+                if (response.status === 'success') {
+                  pendingCommand.resolve(response.result);
+                } else {
+                  pendingCommand.reject(new Error(response.message || 'Unknown error'));
+                }
               }
             }
+          } catch (error) {
+            console.error('Error parsing response:', error);
           }
-        } catch (error) {
-          console.error('Error parsing response:', error);
+        });
+        
+        this.ws.on('error', (error) => {
+          const err = error as Error;
+          console.error('WebSocket error:', err);
+          if (this.ws) {
+            this.ws.terminate();
+            this.ws = null;
+          }
+        });
+        
+        this.ws.on('close', () => {
+          if (this.connected) {
+            console.log('Disconnected from Godot WebSocket server');
+            this.connected = false;
+          }
+        });
+        
+        // Set connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (this.ws?.readyState !== WebSocket.OPEN) {
+            if (this.ws) {
+              this.ws.terminate();
+              this.ws = null;
+            }
+            reject(new Error('Connection timeout'));
+          }
+        }, this.timeout);
+        
+        this.ws.on('open', () => {
+          clearTimeout(connectionTimeout);
+        });
+      });
+    };
+    
+    // Try connecting with retries
+    while (retries <= this.maxRetries) {
+      try {
+        await tryConnect();
+        return;
+      } catch (error) {
+        retries++;
+        
+        if (retries <= this.maxRetries) {
+          console.log(`Connection attempt failed. Retrying in ${this.retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        } else {
+          throw error;
         }
-      });
-      
-      this.ws.on('error', (error) => {
-        const err = error as Error;
-        console.error('WebSocket error:', err);
-        reject(err);
-      });
-      
-      this.ws.on('close', () => {
-        if (this.connected) {
-          console.log('Disconnected from Godot WebSocket server');
-          this.connected = false;
-        }
-      });
-      
-      // Set connection timeout
-      const connectionTimeout = setTimeout(() => {
-        if (this.ws?.readyState !== WebSocket.OPEN) {
-          this.ws?.terminate();
-          reject(new Error('Connection timeout'));
-        }
-      }, this.timeout);
-      
-      this.ws.on('open', () => {
-        clearTimeout(connectionTimeout);
-      });
-    });
+      }
+    }
   }
   
   /**
