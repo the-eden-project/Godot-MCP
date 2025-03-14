@@ -375,16 +375,17 @@ func _open_scene(client_id: int, params: Dictionary, command_id: String) -> void
 		return _send_error(client_id, "Scene file not found: %s" % path, command_id)
 	
 	# Since we can't directly open scenes in tool scripts,
-	# we'll tell the user to open it manually or use EditorInterface if available
-	var editor_interface = EditorInterface.new() if ClassDB.class_exists("EditorInterface") else null
+	# we need to defer to the plugin which has access to EditorInterface
+	var plugin = Engine.get_meta("GodotMCPPlugin") if Engine.has_meta("GodotMCPPlugin") else null
 	
-	if editor_interface:
+	if plugin and plugin.has_method("get_editor_interface"):
+		var editor_interface = plugin.get_editor_interface()
 		editor_interface.open_scene_from_path(path)
 		_send_success(client_id, {
 			"scene_path": path
 		}, command_id)
 	else:
-		_send_error(client_id, "Cannot open scene directly. Please open it manually: %s" % path, command_id)
+		_send_error(client_id, "Cannot access EditorInterface. Please open the scene manually: %s" % path, command_id)
 
 func _get_current_scene(client_id: int, _params: Dictionary, command_id: String) -> void:
 	if not get_tree().edited_scene_root:

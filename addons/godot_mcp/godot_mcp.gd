@@ -6,6 +6,9 @@ var command_handler = null
 var mcp_panel = null
 
 func _enter_tree():
+	# Store plugin instance for EditorInterface access
+	Engine.set_meta("GodotMCPPlugin", self)
+	
 	# Initialize the websocket server
 	websocket_server = preload("res://addons/godot_mcp/websocket_server.gd").new()
 	add_child(websocket_server)
@@ -23,6 +26,10 @@ func _enter_tree():
 	print("Godot MCP plugin initialized")
 
 func _exit_tree():
+	# Remove plugin instance from Engine metadata
+	if Engine.has_meta("GodotMCPPlugin"):
+		Engine.remove_meta("GodotMCPPlugin")
+	
 	# Stop the websocket server
 	if websocket_server:
 		if websocket_server.is_server_active():
