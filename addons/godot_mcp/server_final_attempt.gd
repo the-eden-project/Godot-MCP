@@ -149,11 +149,11 @@ func _process(_delta):
 							var response = {
 								"jsonrpc": "2.0",
 								"id": data.get("id"),
-								"result": "pong"
+								"result": null  # FastMCP expects null result for pings
 							}
 							var response_text = JSON.stringify(response)
 							client.ws.send_text(response_text)
-							print("[Client ", id, "] Sent pong response: ", response_text)
+							print("[Client ", id, "] Sent ping response: ", response_text)
 						
 						# Handle other MCP commands
 						elif data.has("method"):
