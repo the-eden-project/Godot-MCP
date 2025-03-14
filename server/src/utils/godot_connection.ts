@@ -204,11 +204,11 @@ export class GodotConnection {
   disconnect(): void {
     if (this.ws) {
       // Clear all pending commands
-      for (const [commandId, { reject, timeout }] of this.commandQueue.entries()) {
-        clearTimeout(timeout);
-        reject(new Error('Connection closed'));
+      this.commandQueue.forEach((command, commandId) => {
+        clearTimeout(command.timeout);
+        command.reject(new Error('Connection closed'));
         this.commandQueue.delete(commandId);
-      }
+      });
       
       this.ws.close();
       this.ws = null;
