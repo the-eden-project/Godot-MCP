@@ -2,15 +2,15 @@
 class_name MCPCommandHandler
 extends Node
 
-var _websocket_server: MCPWebSocketServer
+# Changed from specific type to generic for our new implementation
+var _websocket_server
 
 func _ready():
 	print("Command handler initializing...")
 	await get_tree().process_frame
 	_websocket_server = get_parent()
 	print("WebSocket server reference set: ", _websocket_server)
-	_websocket_server.connect("command_received", Callable(self, "_handle_command"))
-	print("Command handler initialized and connected to WebSocket signals")
+	print("Command handler initialized and ready to process commands")
 
 func _handle_command(client_id: int, command: Dictionary) -> void:
 	var command_type = command.get("type", "")
@@ -392,11 +392,22 @@ func _open_scene(client_id: int, params: Dictionary, command_id: String) -> void
 
 func _get_current_scene(client_id: int, _params: Dictionary, command_id: String) -> void:
 	if not get_tree().edited_scene_root:
-		return _send_error(client_id, "No scene is currently being edited", command_id)
+		print("No scene is currently being edited")
+		# Instead of returning an error, return a valid response with empty/default values
+		_send_success(client_id, {
+			"scene_path": "None",
+			"root_node_type": "None",
+			"root_node_name": "None"
+		}, command_id)
+		return
 	
 	var scene_path = get_tree().edited_scene_root.scene_file_path
 	if scene_path.is_empty():
 		scene_path = "Untitled"
+	
+	print("Current scene path: ", scene_path)
+	print("Root node type: ", get_tree().edited_scene_root.get_class())
+	print("Root node name: ", get_tree().edited_scene_root.name)
 	
 	_send_success(client_id, {
 		"scene_path": scene_path,
@@ -450,10 +461,21 @@ func _get_project_info(client_id: int, _params: Dictionary, command_id: String) 
 	var project_name = ProjectSettings.get_setting("application/config/name", "Untitled Project")
 	var project_version = ProjectSettings.get_setting("application/config/version", "1.0.0")
 	
+	# Get Godot version info and structure it as expected by the server
+	var version_info = Engine.get_version_info()
+	print("Raw Godot version info: ", version_info)
+	
+	# Create structured version object with the expected properties
+	var structured_version = {
+		"major": version_info.get("major", 0),
+		"minor": version_info.get("minor", 0),
+		"patch": version_info.get("patch", 0)
+	}
+	
 	_send_success(client_id, {
 		"project_name": project_name,
 		"project_version": project_version,
-		"godot_version": Engine.get_version_info(),
+		"godot_version": structured_version,
 		"current_scene": get_tree().edited_scene_root.scene_file_path if get_tree().edited_scene_root else ""
 	}, command_id)
 
