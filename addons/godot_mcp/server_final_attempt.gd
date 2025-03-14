@@ -5,6 +5,7 @@ var tcp_server := TCPServer.new()
 var port := 9080
 var handshake_timeout := 3000 # ms
 var debug_mode := true
+var log_detailed := true  # Enable detailed logging
 
 class WebSocketClient:
 	var tcp: StreamPeerTCP
@@ -28,7 +29,7 @@ var clients := {}
 var next_client_id := 1
 
 func _enter_tree():
-	print("\n=== FINAL ATTEMPT SERVER STARTING ===")
+	print("\n=== DEBUG SERVER STARTING ===")
 	var err = tcp_server.listen(port)
 	
 	if err == OK:
@@ -46,6 +47,10 @@ func _exit_tree():
 	clients.clear()
 	
 	print("=== SERVER SHUTDOWN ===")
+
+func _log(client_id, message):
+	if log_detailed:
+		print("[Client ", client_id, "] ", message)
 
 func _process(_delta):
 	if not tcp_server.is_listening():
@@ -86,7 +91,7 @@ func _process(_delta):
 				# Check WebSocket state
 				var ws_state = client.ws.get_ready_state()
 				if debug_mode:
-					print("[Client ", id, "] State: ", ws_state)
+					_log(id, "State: " + str(ws_state))
 					
 				if ws_state == WebSocketPeer.STATE_OPEN:
 					print("[Client ", id, "] WebSocket handshake completed")
@@ -121,7 +126,16 @@ func _process(_delta):
 		
 		elif client.state == 0: # Connected
 			# Poll the WebSocket
+			# POLL DEBUG - Print state before poll
+			var pre_state = client.ws.get_ready_state()
+			print("[Client ", id, "] PRE-POLL: State=", pre_state, ", Packet count=", client.ws.get_available_packet_count())
+			
+			# Poll the connection
 			client.ws.poll()
+			
+			# POLL DEBUG - Print state after poll
+			var post_state = client.ws.get_ready_state()
+			print("[Client ", id, "] POST-POLL: State=", post_state, ", Packet count=", client.ws.get_available_packet_count())
 			
 			# Check state
 			var ws_state = client.ws.get_ready_state()
@@ -130,30 +144,39 @@ func _process(_delta):
 				ids_to_remove.append(id)
 				continue
 			
+			# Check for available packets
+			var packet_count = client.ws.get_available_packet_count()
+			print("[Client ", id, "] PACKET CHECK: Count=", packet_count)
+			
 			# Process messages
 			while client.ws.get_available_packet_count() > 0:
 				var packet = client.ws.get_packet()
 				var text = packet.get_string_from_utf8()
 				
-				print("[Client ", id, "] Received: ", text)
+				print("[Client ", id, "] RECEIVED RAW DATA: ", text)
 				
 				# Parse as JSON
 				var json = JSON.new()
-				if json.parse(text) == OK:
+				var parse_result = json.parse(text)
+				_log(id, "JSON parse result: " + str(parse_result))
+				
+				if parse_result == OK:
 					var data = json.get_data()
+					_log(id, "Parsed JSON: " + str(data))
 					
 					# Handle JSON-RPC protocol
 					if data.has("jsonrpc") and data.get("jsonrpc") == "2.0":
 						# Handle ping method
 						if data.has("method") and data.get("method") == "ping":
+							print("[Client ", id, "] Received PING with id: ", data.get("id"))
 							var response = {
 								"jsonrpc": "2.0",
 								"id": data.get("id"),
 								"result": null  # FastMCP expects null result for pings
 							}
 							var response_text = JSON.stringify(response)
-							client.ws.send_text(response_text)
-							print("[Client ", id, "] Sent ping response: ", response_text)
+							var send_result = client.ws.send_text(response_text)
+							print("[Client ", id, "] SENDING PING RESPONSE: ", response_text, " (result: ", send_result, ")")
 						
 						# Handle other MCP commands
 						elif data.has("method"):
@@ -174,8 +197,8 @@ func _process(_delta):
 							}
 							
 							var response_text = JSON.stringify(response)
-							client.ws.send_text(response_text)
-							print("[Client ", id, "] Sent response: ", response_text)
+							var send_result = client.ws.send_text(response_text)
+							print("[Client ", id, "] SENT RESPONSE: ", response_text, " (result: ", send_result, ")")
 					
 					# Handle legacy command format
 					elif data.has("type"):
@@ -193,8 +216,8 @@ func _process(_delta):
 						}
 						
 						var response_text = JSON.stringify(response)
-						client.ws.send_text(response_text)
-						print("[Client ", id, "] Sent response: ", response_text)
+						var send_result = client.ws.send_text(response_text)
+						print("[Client ", id, "] SENT RESPONSE: ", response_text, " (result: ", send_result, ")")
 	
 	# Remove clients that need to be removed
 	for id in ids_to_remove:
