@@ -44,7 +44,9 @@ export class GodotConnection {
     private timeout: number = 20000,
     private maxRetries: number = 3,
     private retryDelay: number = 2000
-  ) {}
+  ) {
+    console.log('GodotConnection created with URL:', this.url);
+  }
   
   /**
    * Connects to the Godot WebSocket server
@@ -58,7 +60,12 @@ export class GodotConnection {
       return new Promise<void>((resolve, reject) => {
         console.log(`Connecting to Godot WebSocket server at ${this.url}... (Attempt ${retries + 1}/${this.maxRetries + 1})`);
         
-        this.ws = new WebSocket(this.url);
+        // Use protocol option to match Godot's supported_protocols
+        this.ws = new WebSocket(this.url, {
+          protocol: 'json',
+          handshakeTimeout: 8000,  // Increase handshake timeout
+          perMessageDeflate: false // Disable compression for compatibility
+        });
         
         this.ws.on('open', () => {
           this.connected = true;
@@ -95,10 +102,8 @@ export class GodotConnection {
         this.ws.on('error', (error) => {
           const err = error as Error;
           console.error('WebSocket error:', err);
-          if (this.ws) {
-            this.ws.terminate();
-            this.ws = null;
-          }
+          // Don't terminate the connection on error - let the timeout handle it
+          // Just log the error and allow retry mechanism to work
         });
         
         this.ws.on('close', () => {

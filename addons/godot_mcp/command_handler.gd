@@ -5,9 +5,12 @@ extends Node
 var _websocket_server: MCPWebSocketServer
 
 func _ready():
+	print("Command handler initializing...")
 	await get_tree().process_frame
 	_websocket_server = get_parent()
+	print("WebSocket server reference set: ", _websocket_server)
 	_websocket_server.connect("command_received", Callable(self, "_handle_command"))
+	print("Command handler initialized and connected to WebSocket signals")
 
 func _handle_command(client_id: int, command: Dictionary) -> void:
 	var command_type = command.get("type", "")

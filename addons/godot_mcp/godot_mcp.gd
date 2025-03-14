@@ -32,7 +32,7 @@ func _enter_tree():
 	print("Starting WebSocket server on port", websocket_server.get_port(), "...")
 	var result = websocket_server.start_server()
 	if result == OK:
-		print("WebSocket server started successfully")
+		print("WebSocket server started successfully on ws://localhost:" + str(websocket_server.get_port()))
 	else:
 		printerr("Failed to start WebSocket server: ", result)
 	
