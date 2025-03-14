@@ -56,9 +56,9 @@ static func create_resource(type_name: String) -> Resource:
 static func get_resource_types(base_class: String = "Resource") -> Array[String]:
 	var result: Array[String] = []
 	
-	for class_name in ClassDB.get_class_list():
-		if ClassDB.is_parent_class(class_name, base_class) and ClassDB.can_instantiate(class_name):
-			result.append(class_name)
+	for class_type in ClassDB.get_class_list():
+		if ClassDB.is_parent_class(class_type, base_class) and ClassDB.can_instantiate(class_type):
+			result.append(class_type)
 	
 	return result
 
@@ -74,8 +74,8 @@ static func resource_to_dict(resource: Resource) -> Dictionary:
 	# Get properties
 	var property_list = resource.get_property_list()
 	for prop in property_list:
-		var name = prop["name"]
-		if not name.begins_with("_") and name != "resource_path" and name != "resource_name":
-			result["properties"][name] = resource.get(name)
+		var prop_name = prop["name"]
+		if not prop_name.begins_with("_") and prop_name != "resource_path" and prop_name != "resource_name":
+			result["properties"][prop_name] = resource.get(prop_name)
 	
 	return result
