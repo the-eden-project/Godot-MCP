@@ -14,6 +14,10 @@ func _enter_tree():
 	else:
 		printerr("WS Server Plugin: Failed to listen on port", _port, "error:", err)
 	
+	# Store a reference to this plugin in the Engine metadata
+	# This makes it accessible to the command handler
+	Engine.set_meta("GodotMCPPlugin", self)
+	
 	print("WS Server Plugin: Initialized")
 
 func _exit_tree():
@@ -21,7 +25,19 @@ func _exit_tree():
 		_server.stop()
 		print("WS Server Plugin: Stopped listening")
 	
+	# Remove the reference when plugin is disabled
+	if Engine.has_meta("GodotMCPPlugin"):
+		Engine.remove_meta("GodotMCPPlugin")
+	
 	print("WS Server Plugin: Shutdown")
+
+# Method to access the editor's UndoRedo system
+func get_undo_redo():
+	return get_undo_redo()
+
+# Method to expose the editor interface
+func get_editor_interface():
+	return get_editor_interface()
 
 func _process(_delta):
 	if not _server.is_listening():

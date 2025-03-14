@@ -60,6 +60,55 @@ func _handle_command(client_id: int, command: Dictionary) -> void:
 		_:
 			_send_error(client_id, "Unknown command: %s" % command_type, command_id)
 
+# Helper function to access nodes in the editor context
+func _get_editor_node(path: String) -> Node:
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		print("GodotMCPPlugin not found in Engine metadata")
+		return null
+		
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
+	if not edited_scene_root:
+		print("No edited scene found")
+		return null
+		
+	# Handle absolute paths
+	if path == "/root" or path == "":
+		return edited_scene_root
+		
+	if path.begins_with("/root/"):
+		path = path.substr(6)  # Remove "/root/"
+	elif path.begins_with("/"):
+		path = path.substr(1)  # Remove leading "/"
+	
+	# Try to find node as child of edited scene root
+	return edited_scene_root.get_node_or_null(path)
+
+# Helper function to mark a scene as modified
+func _mark_scene_modified() -> void:
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		print("GodotMCPPlugin not found in Engine metadata")
+		return
+	
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
+	if edited_scene_root:
+		# This internally marks the scene as modified in the editor
+		editor_interface.mark_scene_as_unsaved(edited_scene_root)
+
+# Helper function to access the EditorUndoRedoManager
+func _get_undo_redo():
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin or not plugin.has_method("get_undo_redo"):
+		print("Cannot access UndoRedo from plugin")
+		return null
+		
+	return plugin.get_undo_redo()
+
 # Node operations
 func _create_node(client_id: int, params: Dictionary, command_id: String) -> void:
 	var parent_path = params.get("parent_path", "/root")
@@ -70,14 +119,24 @@ func _create_node(client_id: int, params: Dictionary, command_id: String) -> voi
 	if not ClassDB.class_exists(node_type):
 		return _send_error(client_id, "Invalid node type: %s" % node_type, command_id)
 	
-	# Get the parent node
-	var parent = get_node_or_null(parent_path)
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
+	if not edited_scene_root:
+		return _send_error(client_id, "No scene is currently being edited", command_id)
+	
+	# Get the parent node using the editor node helper
+	var parent = _get_editor_node(parent_path)
 	if not parent:
 		return _send_error(client_id, "Parent node not found: %s" % parent_path, command_id)
 	
-	# Create the new node
+	# Create the node
 	var node
-	
 	if ClassDB.can_instantiate(node_type):
 		node = ClassDB.instantiate(node_type)
 	else:
@@ -93,11 +152,13 @@ func _create_node(client_id: int, params: Dictionary, command_id: String) -> voi
 	parent.add_child(node)
 	
 	# Set owner for proper serialization
-	if get_tree().edited_scene_root:
-		node.owner = get_tree().edited_scene_root
+	node.owner = edited_scene_root
+	
+	# Mark the scene as modified
+	_mark_scene_modified()
 	
 	_send_success(client_id, {
-		"node_path": node.get_path()
+		"node_path": parent_path + "/" + node_name
 	}, command_id)
 
 func _delete_node(client_id: int, params: Dictionary, command_id: String) -> void:
@@ -107,17 +168,37 @@ func _delete_node(client_id: int, params: Dictionary, command_id: String) -> voi
 	if node_path.is_empty():
 		return _send_error(client_id, "Node path cannot be empty", command_id)
 	
-	# Get the node
-	var node = get_node_or_null(node_path)
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
+	if not edited_scene_root:
+		return _send_error(client_id, "No scene is currently being edited", command_id)
+	
+	# Get the node using the editor node helper
+	var node = _get_editor_node(node_path)
 	if not node:
 		return _send_error(client_id, "Node not found: %s" % node_path, command_id)
 	
 	# Cannot delete the root node
-	if node == get_tree().root:
+	if node == edited_scene_root:
 		return _send_error(client_id, "Cannot delete the root node", command_id)
 	
-	# Delete the node
+	# Get parent for operation
+	var parent = node.get_parent()
+	if not parent:
+		return _send_error(client_id, "Node has no parent: %s" % node_path, command_id)
+	
+	# Remove the node
+	parent.remove_child(node)
 	node.queue_free()
+	
+	# Mark the scene as modified
+	_mark_scene_modified()
 	
 	_send_success(client_id, {
 		"deleted_node_path": node_path
@@ -138,8 +219,13 @@ func _update_node_property(client_id: int, params: Dictionary, command_id: Strin
 	if property_value == null:
 		return _send_error(client_id, "Property value cannot be null", command_id)
 	
-	# Get the node
-	var node = get_node_or_null(node_path)
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	# Get the node using the editor node helper
+	var node = _get_editor_node(node_path)
 	if not node:
 		return _send_error(client_id, "Node not found: %s" % node_path, command_id)
 	
@@ -147,8 +233,24 @@ func _update_node_property(client_id: int, params: Dictionary, command_id: Strin
 	if not property_name in node:
 		return _send_error(client_id, "Property %s does not exist on node %s" % [property_name, node_path], command_id)
 	
-	# Set the property
-	node.set(property_name, property_value)
+	# Get current property value for undo
+	var old_value = node.get(property_name)
+	
+	# Get undo/redo system
+	var undo_redo = _get_undo_redo()
+	if not undo_redo:
+		# Fallback method if we can't get undo/redo
+		node.set(property_name, property_value)
+		_mark_scene_modified()
+	else:
+		# Use undo/redo for proper editor integration
+		undo_redo.create_action("Update Property: " + property_name)
+		undo_redo.add_do_property(node, property_name, property_value)
+		undo_redo.add_undo_property(node, property_name, old_value)
+		undo_redo.commit_action()
+	
+	# Mark the scene as modified
+	_mark_scene_modified()
 	
 	_send_success(client_id, {
 		"node_path": node_path,
@@ -163,8 +265,8 @@ func _get_node_properties(client_id: int, params: Dictionary, command_id: String
 	if node_path.is_empty():
 		return _send_error(client_id, "Node path cannot be empty", command_id)
 	
-	# Get the node
-	var node = get_node_or_null(node_path)
+	# Get the node using the editor node helper
+	var node = _get_editor_node(node_path)
 	if not node:
 		return _send_error(client_id, "Node not found: %s" % node_path, command_id)
 	
@@ -185,8 +287,8 @@ func _get_node_properties(client_id: int, params: Dictionary, command_id: String
 func _list_nodes(client_id: int, params: Dictionary, command_id: String) -> void:
 	var parent_path = params.get("parent_path", "/root")
 	
-	# Get the parent node
-	var parent = get_node_or_null(parent_path)
+	# Get the parent node using the editor node helper
+	var parent = _get_editor_node(parent_path)
 	if not parent:
 		return _send_error(client_id, "Parent node not found: %s" % parent_path, command_id)
 	
@@ -196,7 +298,7 @@ func _list_nodes(client_id: int, params: Dictionary, command_id: String) -> void
 		children.append({
 			"name": child.name,
 			"type": child.get_class(),
-			"path": child.get_path()
+			"path": str(child.get_path()).replace(str(parent.get_path()), parent_path)
 		})
 	
 	_send_success(client_id, {
@@ -221,6 +323,14 @@ func _create_script(client_id: int, params: Dictionary, command_id: String) -> v
 	if not script_path.ends_with(".gd"):
 		script_path += ".gd"
 	
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	var script_editor = editor_interface.get_script_editor()
+	
 	# Create the directory if it doesn't exist
 	var dir = script_path.get_base_dir()
 	if not DirAccess.dir_exists_absolute(dir):
@@ -236,17 +346,42 @@ func _create_script(client_id: int, params: Dictionary, command_id: String) -> v
 	file.store_string(content)
 	file = null  # Close the file
 	
+	# Refresh the filesystem
+	editor_interface.get_resource_filesystem().scan()
+	
 	# Attach the script to a node if specified
 	if not node_path.is_empty():
-		var node = get_node_or_null(node_path)
+		var node = _get_editor_node(node_path)
 		if not node:
 			return _send_error(client_id, "Node not found: %s" % node_path, command_id)
+		
+		# Wait for script to be recognized in the filesystem
+		await get_tree().create_timer(0.5).timeout
 		
 		var script = load(script_path)
 		if not script:
 			return _send_error(client_id, "Failed to load script: %s" % script_path, command_id)
 		
-		node.set_script(script)
+		# Use undo/redo for script assignment
+		var undo_redo = _get_undo_redo()
+		if not undo_redo:
+			# Fallback method if we can't get undo/redo
+			node.set_script(script)
+			_mark_scene_modified()
+		else:
+			# Use undo/redo for proper editor integration
+			undo_redo.create_action("Assign Script")
+			undo_redo.add_do_method(node, "set_script", script)
+			undo_redo.add_undo_method(node, "set_script", node.get_script())
+			undo_redo.commit_action()
+		
+		# Mark the scene as modified
+		_mark_scene_modified()
+	
+	# Open the script in the editor
+	var script_resource = load(script_path)
+	if script_resource:
+		editor_interface.edit_script(script_resource)
 	
 	_send_success(client_id, {
 		"script_path": script_path,
@@ -294,7 +429,7 @@ func _get_script(client_id: int, params: Dictionary, command_id: String) -> void
 	
 	# If node_path is provided, get the script from the node
 	if not node_path.is_empty():
-		var node = get_node_or_null(node_path)
+		var node = _get_editor_node(node_path)
 		if not node:
 			return _send_error(client_id, "Node not found: %s" % node_path, command_id)
 		
@@ -329,9 +464,17 @@ func _get_script(client_id: int, params: Dictionary, command_id: String) -> void
 func _save_scene(client_id: int, params: Dictionary, command_id: String) -> void:
 	var path = params.get("path", "")
 	
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
 	# If no path provided, use the current scene path
-	if path.is_empty() and get_tree().edited_scene_root:
-		path = get_tree().edited_scene_root.scene_file_path
+	if path.is_empty() and edited_scene_root:
+		path = edited_scene_root.scene_file_path
 	
 	# Validation
 	if path.is_empty():
@@ -345,12 +488,12 @@ func _save_scene(client_id: int, params: Dictionary, command_id: String) -> void
 		path += ".tscn"
 	
 	# Check if we have an edited scene
-	if not get_tree().edited_scene_root:
+	if not edited_scene_root:
 		return _send_error(client_id, "No scene is currently being edited", command_id)
 	
 	# Save the scene
 	var packed_scene = PackedScene.new()
-	var result = packed_scene.pack(get_tree().edited_scene_root)
+	var result = packed_scene.pack(edited_scene_root)
 	if result != OK:
 		return _send_error(client_id, "Failed to pack scene: %d" % result, command_id)
 	
@@ -391,7 +534,15 @@ func _open_scene(client_id: int, params: Dictionary, command_id: String) -> void
 		_send_error(client_id, "Cannot access EditorInterface. Please open the scene manually: %s" % path, command_id)
 
 func _get_current_scene(client_id: int, _params: Dictionary, command_id: String) -> void:
-	if not get_tree().edited_scene_root:
+	# Get editor plugin and interfaces
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	var edited_scene_root = editor_interface.get_edited_scene_root()
+	
+	if not edited_scene_root:
 		print("No scene is currently being edited")
 		# Instead of returning an error, return a valid response with empty/default values
 		_send_success(client_id, {
@@ -401,18 +552,18 @@ func _get_current_scene(client_id: int, _params: Dictionary, command_id: String)
 		}, command_id)
 		return
 	
-	var scene_path = get_tree().edited_scene_root.scene_file_path
+	var scene_path = edited_scene_root.scene_file_path
 	if scene_path.is_empty():
 		scene_path = "Untitled"
 	
 	print("Current scene path: ", scene_path)
-	print("Root node type: ", get_tree().edited_scene_root.get_class())
-	print("Root node name: ", get_tree().edited_scene_root.name)
+	print("Root node type: ", edited_scene_root.get_class())
+	print("Root node name: ", edited_scene_root.name)
 	
 	_send_success(client_id, {
 		"scene_path": scene_path,
-		"root_node_type": get_tree().edited_scene_root.get_class(),
-		"root_node_name": get_tree().edited_scene_root.name
+		"root_node_type": edited_scene_root.get_class(),
+		"root_node_name": edited_scene_root.name
 	}, command_id)
 
 # Resource operations
@@ -432,13 +583,23 @@ func _create_resource(client_id: int, params: Dictionary, command_id: String) ->
 	if not resource_path.begins_with("res://"):
 		resource_path = "res://" + resource_path
 	
+	# Get editor interface
+	var plugin = Engine.get_meta("GodotMCPPlugin")
+	if not plugin:
+		return _send_error(client_id, "GodotMCPPlugin not found in Engine metadata", command_id)
+	
+	var editor_interface = plugin.get_editor_interface()
+	
 	# Create the resource
 	var resource
 	
 	if ClassDB.class_exists(resource_type):
-		resource = ClassDB.instantiate(resource_type)
-		if not resource:
-			return _send_error(client_id, "Failed to instantiate resource: %s" % resource_type, command_id)
+		if ClassDB.is_parent_class(resource_type, "Resource"):
+			resource = ClassDB.instantiate(resource_type)
+			if not resource:
+				return _send_error(client_id, "Failed to instantiate resource: %s" % resource_type, command_id)
+		else:
+			return _send_error(client_id, "Type is not a Resource: %s" % resource_type, command_id)
 	else:
 		return _send_error(client_id, "Invalid resource type: %s" % resource_type, command_id)
 	
@@ -446,10 +607,20 @@ func _create_resource(client_id: int, params: Dictionary, command_id: String) ->
 	for key in properties:
 		resource.set(key, properties[key])
 	
+	# Create directory if needed
+	var dir = resource_path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir):
+		var err = DirAccess.make_dir_recursive_absolute(dir)
+		if err != OK:
+			return _send_error(client_id, "Failed to create directory: %s (Error code: %d)" % [dir, err], command_id)
+	
 	# Save the resource
 	var result = ResourceSaver.save(resource, resource_path)
 	if result != OK:
 		return _send_error(client_id, "Failed to save resource: %d" % result, command_id)
+	
+	# Refresh the filesystem
+	editor_interface.get_resource_filesystem().scan()
 	
 	_send_success(client_id, {
 		"resource_path": resource_path,
@@ -477,6 +648,44 @@ func _get_project_info(client_id: int, _params: Dictionary, command_id: String) 
 		"project_version": project_version,
 		"godot_version": structured_version,
 		"current_scene": get_tree().edited_scene_root.scene_file_path if get_tree().edited_scene_root else ""
+	}, command_id)
+
+# Script template generation
+func _create_script_template(client_id: int, params: Dictionary, command_id: String) -> void:
+	var extends_type = params.get("extends_type", "Node")
+	var class_name_str = params.get("class_name", "")
+	var include_ready = params.get("include_ready", true)
+	var include_process = params.get("include_process", false)
+	var include_physics = params.get("include_physics", false)
+	var include_input = params.get("include_input", false)
+	
+	# Generate script content
+	var content = "extends " + extends_type + "\n\n"
+	
+	if not class_name_str.is_empty():
+		content += "class_name " + class_name_str + "\n\n"
+	
+	# Add variables section placeholder
+	content += "# Member variables here\n\n"
+	
+	# Add ready function
+	if include_ready:
+		content += "func _ready():\n\tpass\n\n"
+	
+	# Add process function
+	if include_process:
+		content += "func _process(delta):\n\tpass\n\n"
+	
+	# Add physics process function
+	if include_physics:
+		content += "func _physics_process(delta):\n\tpass\n\n"
+	
+	# Add input function
+	if include_input:
+		content += "func _input(event):\n\tpass\n\n"
+	
+	_send_success(client_id, {
+		"content": content
 	}, command_id)
 
 # Helper functions
