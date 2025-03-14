@@ -8,7 +8,7 @@ import { getGodotConnection } from './utils/godot_connection.js';
  * Main entry point for the Godot MCP server
  */
 async function main() {
-  console.log('Starting Godot MCP server...');
+  console.error('Starting Godot MCP server...');
 
   // Create FastMCP instance
   const server = new FastMCP({
@@ -25,7 +25,7 @@ async function main() {
   try {
     const godot = getGodotConnection();
     await godot.connect();
-    console.log('Successfully connected to Godot WebSocket server');
+    console.error('Successfully connected to Godot WebSocket server');
   } catch (error) {
     const err = error as Error;
     console.warn(`Could not connect to Godot: ${err.message}`);
@@ -37,11 +37,11 @@ async function main() {
     transportType: 'stdio',
   });
 
-  console.log('Godot MCP server started');
+  console.error('Godot MCP server started');
 
   // Handle cleanup
   const cleanup = () => {
-    console.log('Shutting down Godot MCP server...');
+    console.error('Shutting down Godot MCP server...');
     const godot = getGodotConnection();
     godot.disconnect();
     process.exit(0);

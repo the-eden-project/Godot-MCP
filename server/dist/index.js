@@ -57,7 +57,7 @@ function main() {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    console.log('Starting Godot MCP server...');
+                    console.error('Starting Godot MCP server...');
                     server = new FastMCP({
                         name: 'GodotMCP',
                         version: '1.0.0',
@@ -73,7 +73,7 @@ function main() {
                     return [4 /*yield*/, godot.connect()];
                 case 2:
                     _a.sent();
-                    console.log('Successfully connected to Godot WebSocket server');
+                    console.error('Successfully connected to Godot WebSocket server');
                     return [3 /*break*/, 4];
                 case 3:
                     error_1 = _a.sent();
@@ -86,9 +86,9 @@ function main() {
                     server.start({
                         transportType: 'stdio',
                     });
-                    console.log('Godot MCP server started');
+                    console.error('Godot MCP server started');
                     cleanup = function () {
-                        console.log('Shutting down Godot MCP server...');
+                        console.error('Shutting down Godot MCP server...');
                         var godot = getGodotConnection();
                         godot.disconnect();
                         process.exit(0);

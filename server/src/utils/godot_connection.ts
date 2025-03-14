@@ -45,7 +45,7 @@ export class GodotConnection {
     private maxRetries: number = 3,
     private retryDelay: number = 2000
   ) {
-    console.log('GodotConnection created with URL:', this.url);
+    console.error('GodotConnection created with URL:', this.url);
   }
   
   /**
@@ -58,7 +58,7 @@ export class GodotConnection {
     
     const tryConnect = (): Promise<void> => {
       return new Promise<void>((resolve, reject) => {
-        console.log(`Connecting to Godot WebSocket server at ${this.url}... (Attempt ${retries + 1}/${this.maxRetries + 1})`);
+        console.error(`Connecting to Godot WebSocket server at ${this.url}... (Attempt ${retries + 1}/${this.maxRetries + 1})`);
         
         // Use protocol option to match Godot's supported_protocols
         this.ws = new WebSocket(this.url, {
@@ -69,14 +69,14 @@ export class GodotConnection {
         
         this.ws.on('open', () => {
           this.connected = true;
-          console.log('Connected to Godot WebSocket server');
+          console.error('Connected to Godot WebSocket server');
           resolve();
         });
         
         this.ws.on('message', (data: Buffer) => {
           try {
             const response: GodotResponse = JSON.parse(data.toString());
-            console.log('Received response:', response);
+            console.error('Received response:', response);
             
             // Handle command responses
             if ('commandId' in response) {
@@ -108,7 +108,7 @@ export class GodotConnection {
         
         this.ws.on('close', () => {
           if (this.connected) {
-            console.log('Disconnected from Godot WebSocket server');
+            console.error('Disconnected from Godot WebSocket server');
             this.connected = false;
           }
         });
@@ -139,7 +139,7 @@ export class GodotConnection {
         retries++;
         
         if (retries <= this.maxRetries) {
-          console.log(`Connection attempt failed. Retrying in ${this.retryDelay}ms...`);
+          console.error(`Connection attempt failed. Retrying in ${this.retryDelay}ms...`);
           await new Promise(resolve => setTimeout(resolve, this.retryDelay));
         } else {
           throw error;
