@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { getGodotConnection } from '../utils/godot_connection';
-import { MCPTool, CommandResult } from '../utils/types';
+import { getGodotConnection } from '../utils/godot_connection.js';
+import { MCPTool, CommandResult } from '../utils/types.js';
 
 /**
  * Type definitions for script tool parameters

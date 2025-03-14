@@ -1,8 +1,8 @@
 import { FastMCP } from 'fastmcp';
-import { nodeTools } from './tools/node_tools';
-import { scriptTools } from './tools/script_tools';
-import { sceneTools } from './tools/scene_tools';
-import { getGodotConnection } from './utils/godot_connection';
+import { nodeTools } from './tools/node_tools.js';
+import { scriptTools } from './tools/script_tools.js';
+import { sceneTools } from './tools/scene_tools.js';
+import { getGodotConnection } from './utils/godot_connection.js';
 
 /**
  * Main entry point for the Godot MCP server

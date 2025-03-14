@@ -1,8 +1,9 @@
 {
   "mcpServers": {
-    "godot-script-server": {
+    "godot-mcp": {
       "command": "node",
       "args": [
+        "--experimental-modules",
         "/Users/Shared/Godot/godot-mcp/server/dist/index.js"
       ],
       "env": {
