@@ -5,12 +5,45 @@ import { z } from 'zod';
  * Resource template that provides the content of a specific script
  */
 export const scriptResourceTemplate = {
-  name: 'godot/script/:path',
-  description: 'Content and metadata of a Godot script file',
-  parameters: z.object({
-    path: z.string().describe('Path to the script file (e.g., "res://player.gd")')
-  }),
-  fetch: async (params: { path: string }) => {
+  uriTemplate: 'godot/script/{path}',
+  name: 'Godot Script Content',
+  mimeType: 'text/plain',
+  arguments: [
+    {
+      name: 'path',
+      description: 'Path to the script file (e.g., "player.gd")',
+      required: true,
+      complete: async (value) => {
+        // Try to get matching scripts for autocompletion
+        try {
+          const godot = getGodotConnection();
+          const result = await godot.sendCommand('list_project_files', {
+            extensions: ['.gd', '.cs']
+          });
+          
+          if (result && result.files) {
+            const matchingFiles = result.files.filter((file: string) => 
+              file.includes(value) && (file.endsWith('.gd') || file.endsWith('.cs'))
+            ).map((file: string) => {
+              // Strip res:// prefix for cleaner display
+              return file.replace('res://', '');
+            });
+            
+            return {
+              values: matchingFiles
+            };
+          }
+        } catch (error) {
+          console.error('Error completing script paths:', error);
+        }
+        
+        return {
+          values: []
+        };
+      }
+    }
+  ],
+  async load(params: { path: string }) {
     const godot = getGodotConnection();
     let scriptPath = params.path;
     
@@ -26,10 +59,12 @@ export const scriptResourceTemplate = {
       });
       
       return {
-        content: result.content,
-        path: result.script_path,
-        language: scriptPath.endsWith('.gd') ? 'gdscript' : 
-                 scriptPath.endsWith('.cs') ? 'csharp' : 'unknown'
+        text: result.content,
+        metadata: {
+          path: result.script_path,
+          language: scriptPath.endsWith('.gd') ? 'gdscript' : 
+                   scriptPath.endsWith('.cs') ? 'csharp' : 'unknown'
+        }
       };
     } catch (error) {
       console.error('Error fetching script content:', error);
@@ -42,9 +77,10 @@ export const scriptResourceTemplate = {
  * Resource that provides a list of all scripts in the project
  */
 export const scriptListResource = {
-  name: 'godot/scripts',
-  description: 'List of all script files in the Godot project',
-  fetch: async () => {
+  uri: 'godot/scripts',
+  name: 'Godot Script List',
+  mimeType: 'application/json',
+  async load() {
     const godot = getGodotConnection();
     
     try {
@@ -55,17 +91,21 @@ export const scriptListResource = {
       
       if (result && result.files) {
         return {
-          scripts: result.files,
-          count: result.files.length,
-          gdscripts: result.files.filter((f: string) => f.endsWith('.gd')),
-          csharp_scripts: result.files.filter((f: string) => f.endsWith('.cs'))
+          text: JSON.stringify({
+            scripts: result.files,
+            count: result.files.length,
+            gdscripts: result.files.filter((f: string) => f.endsWith('.gd')),
+            csharp_scripts: result.files.filter((f: string) => f.endsWith('.cs'))
+          })
         };
       } else {
         return {
-          scripts: [],
-          count: 0,
-          gdscripts: [],
-          csharp_scripts: []
+          text: JSON.stringify({
+            scripts: [],
+            count: 0,
+            gdscripts: [],
+            csharp_scripts: []
+          })
         };
       }
     } catch (error) {
@@ -79,12 +119,44 @@ export const scriptListResource = {
  * Resource that provides metadata for a specific script, including classes and methods
  */
 export const scriptMetadataTemplate = {
-  name: 'godot/script/metadata/:path',
-  description: 'Metadata about a Godot script including classes, methods, and properties',
-  parameters: z.object({
-    path: z.string().describe('Path to the script file (e.g., "res://player.gd")')
-  }),
-  fetch: async (params: { path: string }) => {
+  uriTemplate: 'godot/script/metadata/{path}',
+  name: 'Godot Script Metadata',
+  mimeType: 'application/json',
+  arguments: [
+    {
+      name: 'path',
+      description: 'Path to the script file (e.g., "player.gd")',
+      required: true,
+      complete: async (value) => {
+        // Use the same completion logic as scriptResourceTemplate
+        try {
+          const godot = getGodotConnection();
+          const result = await godot.sendCommand('list_project_files', {
+            extensions: ['.gd', '.cs']
+          });
+          
+          if (result && result.files) {
+            const matchingFiles = result.files.filter((file: string) => 
+              file.includes(value) && (file.endsWith('.gd') || file.endsWith('.cs'))
+            ).map((file: string) => {
+              return file.replace('res://', '');
+            });
+            
+            return {
+              values: matchingFiles
+            };
+          }
+        } catch (error) {
+          console.error('Error completing script paths:', error);
+        }
+        
+        return {
+          values: []
+        };
+      }
+    }
+  ],
+  async load(params: { path: string }) {
     const godot = getGodotConnection();
     let scriptPath = params.path;
     
@@ -99,7 +171,9 @@ export const scriptMetadataTemplate = {
         path: scriptPath
       });
       
-      return result;
+      return {
+        text: JSON.stringify(result)
+      };
     } catch (error) {
       console.error('Error fetching script metadata:', error);
       throw error;

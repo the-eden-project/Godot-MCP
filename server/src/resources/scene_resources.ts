@@ -5,9 +5,10 @@ import { z } from 'zod';
  * Resource that provides a list of all scenes in the project
  */
 export const sceneListResource = {
-  name: 'godot/scenes',
-  description: 'List of all scene files in the Godot project',
-  fetch: async () => {
+  uri: 'godot/scenes',
+  name: 'Godot Scene List',
+  mimeType: 'application/json',
+  async load() {
     const godot = getGodotConnection();
     
     try {
@@ -18,13 +19,17 @@ export const sceneListResource = {
       
       if (result && result.files) {
         return {
-          scenes: result.files,
-          count: result.files.length
+          text: JSON.stringify({
+            scenes: result.files,
+            count: result.files.length
+          })
         };
       } else {
         return {
-          scenes: [],
-          count: 0
+          text: JSON.stringify({
+            scenes: [],
+            count: 0
+          })
         };
       }
     } catch (error) {
@@ -38,12 +43,45 @@ export const sceneListResource = {
  * Resource template that provides detailed information about a specific scene
  */
 export const sceneStructureTemplate = {
-  name: 'godot/scene/:path',
-  description: 'Detailed structure of a Godot scene',
-  parameters: z.object({
-    path: z.string().describe('Path to the scene file (e.g., "res://my_scene.tscn")')
-  }),
-  fetch: async (params: { path: string }) => {
+  uriTemplate: 'godot/scene/{path}',
+  name: 'Godot Scene Structure',
+  mimeType: 'application/json',
+  arguments: [
+    {
+      name: 'path',
+      description: 'Path to the scene file (e.g., "my_scene.tscn")',
+      required: true,
+      complete: async (value) => {
+        // Try to get matching scenes for autocompletion
+        try {
+          const godot = getGodotConnection();
+          const result = await godot.sendCommand('list_project_files', {
+            extensions: ['.tscn', '.scn']
+          });
+          
+          if (result && result.files) {
+            const matchingFiles = result.files.filter((file: string) => 
+              file.includes(value) && (file.endsWith('.tscn') || file.endsWith('.scn'))
+            ).map((file: string) => {
+              // Strip res:// prefix for cleaner display
+              return file.replace('res://', '');
+            });
+            
+            return {
+              values: matchingFiles
+            };
+          }
+        } catch (error) {
+          console.error('Error completing scene paths:', error);
+        }
+        
+        return {
+          values: []
+        };
+      }
+    }
+  ],
+  async load(params: { path: string }) {
     const godot = getGodotConnection();
     let scenePath = params.path;
     
@@ -58,7 +96,9 @@ export const sceneStructureTemplate = {
         path: scenePath
       });
       
-      return result;
+      return {
+        text: JSON.stringify(result)
+      };
     } catch (error) {
       console.error('Error fetching scene structure:', error);
       throw error;

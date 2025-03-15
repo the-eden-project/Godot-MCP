@@ -4,16 +4,19 @@ import { getGodotConnection } from '../utils/godot_connection.js';
  * Resource that provides information about the current state of the Godot editor
  */
 export const editorStateResource = {
-  name: 'godot/editor/state',
-  description: 'Current state of the Godot editor including open scenes and selected nodes',
-  fetch: async () => {
+  uri: 'godot/editor/state',
+  name: 'Godot Editor State',
+  mimeType: 'application/json',
+  async load() {
     const godot = getGodotConnection();
     
     try {
       // Call a command on the Godot side to get editor state
       const result = await godot.sendCommand('get_editor_state');
       
-      return result;
+      return {
+        text: JSON.stringify(result)
+      };
     } catch (error) {
       console.error('Error fetching editor state:', error);
       throw error;
@@ -25,16 +28,19 @@ export const editorStateResource = {
  * Resource that provides information about the currently selected node
  */
 export const selectedNodeResource = {
-  name: 'godot/editor/selected_node',
-  description: 'Details about the currently selected node in the Godot editor',
-  fetch: async () => {
+  uri: 'godot/editor/selected_node',
+  name: 'Godot Selected Node',
+  mimeType: 'application/json',
+  async load() {
     const godot = getGodotConnection();
     
     try {
       // Call a command on the Godot side to get selected node
       const result = await godot.sendCommand('get_selected_node');
       
-      return result;
+      return {
+        text: JSON.stringify(result)
+      };
     } catch (error) {
       console.error('Error fetching selected node:', error);
       throw error;
@@ -46,9 +52,10 @@ export const selectedNodeResource = {
  * Resource that provides information about the currently edited script
  */
 export const currentScriptResource = {
-  name: 'godot/editor/current_script',
-  description: 'Content and metadata of the currently open script in the Godot editor',
-  fetch: async () => {
+  uri: 'godot/editor/current_script',
+  name: 'Current Script in Editor',
+  mimeType: 'text/plain',
+  async load() {
     const godot = getGodotConnection();
     
     try {
@@ -56,18 +63,22 @@ export const currentScriptResource = {
       const result = await godot.sendCommand('get_current_script');
       
       // If we got a script path, return script content and metadata
-      if (result && result.script_path) {
+      if (result && result.script_found && result.content) {
         return {
-          path: result.script_path,
-          content: result.content,
-          language: result.script_path.endsWith('.gd') ? 'gdscript' : 
-                   result.script_path.endsWith('.cs') ? 'csharp' : 'unknown'
+          text: result.content,
+          metadata: {
+            path: result.script_path,
+            language: result.script_path.endsWith('.gd') ? 'gdscript' : 
+                     result.script_path.endsWith('.cs') ? 'csharp' : 'unknown'
+          }
         };
       } else {
         return {
-          path: null,
-          content: null,
-          language: null
+          text: '',
+          metadata: {
+            error: 'No script currently being edited',
+            script_found: false
+          }
         };
       }
     } catch (error) {
