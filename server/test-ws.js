@@ -1,1 +1,0 @@
-const WebSocket = require('ws'); const ws = new WebSocket('ws://localhost:9080', { timeout: 5000 }); ws.on('open', () => console.log('Connected\!')); ws.on('error', (e) => console.log('Error:', e.message));
