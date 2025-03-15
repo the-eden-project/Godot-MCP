@@ -98,7 +98,7 @@ func _mark_scene_modified() -> void:
 	
 	if edited_scene_root:
 		# This internally marks the scene as modified in the editor
-		editor_interface.mark_scene_as_unsaved(edited_scene_root)
+		editor_interface.mark_scene_as_unsaved()
 
 # Helper function to access the EditorUndoRedoManager
 func _get_undo_redo():
