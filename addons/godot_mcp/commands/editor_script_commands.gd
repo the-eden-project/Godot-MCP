@@ -17,7 +17,7 @@ func _execute_editor_script(client_id: int, params: Dictionary, command_id: Stri
 		return _send_error(client_id, "Code cannot be empty", command_id)
 	
 	# Create a temporary script node to execute the code
-	var script_node = Node.new()
+	var script_node := Node.new()
 	script_node.name = "EditorScriptExecutor"
 	add_child(script_node)
 	
@@ -118,15 +118,10 @@ func _execute_code():
 	await get_tree().process_frame
 	await get_tree().process_frame
 	
-	# Collect results
-	if script_node.has_variable("result"):
-		execution_result = script_node.get("result")
-	
-	if script_node.has_variable("_output_array"):
-		output = script_node.get("_output_array")
-	
-	if script_node.has_variable("_error_message"):
-		error_message = script_node.get("_error_message")
+	# Collect results safely by checking if properties exist
+	execution_result = script_node.get("result")
+	output = script_node._output_array
+	error_message = script_node._error_message
 	
 	# Clean up
 	remove_child(script_node)
