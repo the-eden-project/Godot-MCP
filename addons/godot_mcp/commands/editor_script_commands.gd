@@ -18,6 +18,7 @@ func _execute_editor_script(client_id: int, params: Dictionary, command_id: Stri
 	
 	# Create a temporary script node to execute the code
 	var script_node = Node.new()
+	script_node.name = "EditorScriptExecutor"
 	add_child(script_node)
 	
 	# Create a temporary script
@@ -38,6 +39,8 @@ extends Node
 # Variable to store the result
 var result = null
 var _output_array = []
+var _error_message = ""
+var _parent
 
 # Custom print function that stores output in the array
 func custom_print(value):
@@ -45,49 +48,55 @@ func custom_print(value):
 	print(value)  # Still print to the console for debugging
 
 func _ready():
+	_parent = get_parent()
 	var scene = get_tree().edited_scene_root
 	
-	# Execute the provided code in a try-catch block
-	try:
-		# USER CODE START
+	# Execute the provided code
+	var err = _execute_code()
+	
+	# If there was an error, store it
+	if err != OK:
+		_error_message = "Failed to execute script with error: " + str(err)
+
+func _execute_code():
+	# USER CODE START
 {user_code}
-		# USER CODE END
-		
-	except (error):
-		printerr("Error executing script: " + str(error))
-		get_parent()._on_script_error(str(error))
+	# USER CODE END
+	return OK
 """
 	
 	# Indent the user code
 	var indented_code = ""
 	var lines = modified_code.split("\n")
 	for line in lines:
-		indented_code += "\t\t" + line + "\n"
+		indented_code += "\t" + line + "\n"
 	
 	script_content = script_content.replace("{user_code}", indented_code)
 	script.source_code = script_content
-	script.reload()
 	
-	# Create a method to handle script errors
-	script_node._on_script_error = func(error): 
-		error_message = error
-	
-	# Create a method to retrieve the output
-	script_node.get_output = func():
-		return script_node._output_array if script_node.has_variable("_output_array") else []
+	# Check for script errors during parsing
+	var error = script.reload()
+	if error != OK:
+		remove_child(script_node)
+		script_node.queue_free()
+		return _send_error(client_id, "Script parsing error: " + str(error), command_id)
 	
 	# Assign the script to the node
 	script_node.set_script(script)
 	
-	# Wait a frame to ensure the script has executed
+	# Wait a few frames to ensure the script has executed
+	await get_tree().process_frame
 	await get_tree().process_frame
 	
 	# Collect results
-	if script_node.has_method("result"):
-		execution_result = script_node.result
+	if script_node.has_variable("result"):
+		execution_result = script_node.get("result")
 	
-	if script_node.has_method("get_output"):
-		output = script_node.get_output()
+	if script_node.has_variable("_output_array"):
+		output = script_node.get("_output_array")
+	
+	if script_node.has_variable("_error_message"):
+		error_message = script_node.get("_error_message")
 	
 	# Clean up
 	remove_child(script_node)
