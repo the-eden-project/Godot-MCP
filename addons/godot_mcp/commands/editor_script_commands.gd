@@ -23,27 +23,29 @@ func _execute_editor_script(client_id: int, params: Dictionary, command_id: Stri
 	# Create a temporary script
 	var script = GDScript.new()
 	
-	# Capture output with a custom print function
 	var output = []
-	
-	# Create a custom print capture function
-	var capture_print = func(text): output.append(str(text))
-	
 	var error_message = ""
 	var execution_result = null
 	
-	# Prepare script with error handling
+	# Replace print() calls with custom_print() in the user code
+	var modified_code = _replace_print_calls(code)
+	
+	# Prepare script with error handling and custom print function
 	var script_content = """
 @tool
 extends Node
 
 # Variable to store the result
 var result = null
+var _output_array = []
+
+# Custom print function that stores output in the array
+func custom_print(value):
+	_output_array.append(str(value))
+	print(value)  # Still print to the console for debugging
+
 func _ready():
 	var scene = get_tree().edited_scene_root
-	
-	# Custom print function that captures output
-	var print_capture = func(text): get_parent().capture_print(text)
 	
 	# Execute the provided code in a try-catch block
 	try:
@@ -52,27 +54,27 @@ func _ready():
 		# USER CODE END
 		
 	except (error):
-	except (error):
 		printerr("Error executing script: " + str(error))
 		get_parent()._on_script_error(str(error))
 """
 	
 	# Indent the user code
 	var indented_code = ""
-	var lines = code.split("\n")
+	var lines = modified_code.split("\n")
 	for line in lines:
 		indented_code += "\t\t" + line + "\n"
 	
-	# Create methods to handle script errors and print capture
+	script_content = script_content.replace("{user_code}", indented_code)
+	script.source_code = script_content
+	script.reload()
+	
+	# Create a method to handle script errors
 	script_node._on_script_error = func(error): 
 		error_message = error
 	
-	# Add a capture_print method to our command processor instance that the script can call
-	self.capture_print = capture_print
-	
-	# Assign the script to the node
-	script_node.set_script(script)
-		error_message = error
+	# Create a method to retrieve the output
+	script_node.get_output = func():
+		return script_node._output_array if script_node.has_variable("_output_array") else []
 	
 	# Assign the script to the node
 	script_node.set_script(script)
@@ -80,15 +82,16 @@ func _ready():
 	# Wait a frame to ensure the script has executed
 	await get_tree().process_frame
 	
-	# Clean up our temporary capture_print method
-	self.set_meta("capture_print", null)
+	# Collect results
+	if script_node.has_method("result"):
 		execution_result = script_node.result
 	
+	if script_node.has_method("get_output"):
+		output = script_node.get_output()
+	
+	# Clean up
 	remove_child(script_node)
 	script_node.queue_free()
-	
-	# Restore original print function
-	print = original_print
 	
 	# Build the response
 	var result_data = {
@@ -102,3 +105,26 @@ func _ready():
 		result_data["result"] = execution_result
 	
 	_send_success(client_id, result_data, command_id)
+
+# Replace print() calls with custom_print() in the user code
+func _replace_print_calls(code: String) -> String:
+	var regex = RegEx.new()
+	regex.compile("print\\s*\\((.+?)\\)")
+	
+	var result = regex.search_all(code)
+	var modified_code = code
+	
+	# Process matches in reverse order to avoid issues with changing string length
+	for i in range(result.size() - 1, -1, -1):
+		var match_obj = result[i]
+		var full_match = match_obj.get_string()
+		var arg = match_obj.get_string(1)
+		
+		var replacement = "custom_print(" + arg + ")"
+		
+		var start = match_obj.get_start()
+		var end = match_obj.get_end()
+		
+		modified_code = modified_code.substr(0, start) + replacement + modified_code.substr(end)
+	
+	return modified_code
