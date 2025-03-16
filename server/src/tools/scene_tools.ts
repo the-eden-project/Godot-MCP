@@ -13,6 +13,11 @@ interface OpenSceneParams {
   path: string;
 }
 
+interface CreateSceneParams {
+  path: string;
+  root_node_type?: string;
+}
+
 interface CreateResourceParams {
   resource_type: string;
   resource_path: string;
@@ -23,6 +28,27 @@ interface CreateResourceParams {
  * Definition for scene tools - operations that manipulate Godot scenes
  */
 export const sceneTools: MCPTool[] = [
+  {
+    name: 'create_scene',
+    description: 'Create a new empty scene with optional root node type',
+    parameters: z.object({
+      path: z.string()
+        .describe('Path where the new scene will be saved (e.g. "res://scenes/new_scene.tscn")'),
+      root_node_type: z.string().optional()
+        .describe('Type of root node to create (e.g. "Node2D", "Node3D", "Control"). Defaults to "Node" if not specified'),
+    }),
+    execute: async ({ path, root_node_type = "Node" }: CreateSceneParams): Promise<string> => {
+      const godot = getGodotConnection();
+      
+      try {
+        const result = await godot.sendCommand<CommandResult>('create_scene', { path, root_node_type });
+        return `Created new scene at ${result.scene_path} with root node type ${result.root_node_type}`;
+      } catch (error) {
+        throw new Error(`Failed to create scene: ${(error as Error).message}`);
+      }
+    },
+  },
+
   {
     name: 'save_scene',
     description: 'Save the current scene to disk',

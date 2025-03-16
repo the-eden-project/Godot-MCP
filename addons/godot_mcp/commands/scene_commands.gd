@@ -16,6 +16,9 @@ func process_command(client_id: int, command_type: String, params: Dictionary, c
 		"get_scene_structure":
 			_get_scene_structure(client_id, params, command_id)
 			return true
+		"create_scene":
+			_create_scene(client_id, params, command_id)
+			return true
 	return false  # Command not handled
 
 func _save_scene(client_id: int, params: Dictionary, command_id: String) -> void:
@@ -200,3 +203,84 @@ func _get_node_structure(node: Node) -> Dictionary:
 	structure["children"] = children
 	
 	return structure
+
+func _create_scene(client_id: int, params: Dictionary, command_id: String) -> void:
+	var path = params.get("path", "")
+	var root_node_type = params.get("root_node_type", "Node")
+	
+	# Validation
+	if path.is_empty():
+		return _send_error(client_id, "Scene path cannot be empty", command_id)
+	
+	# Make sure we have an absolute path
+	if not path.begins_with("res://"):
+		path = "res://" + path
+	
+	# Ensure path ends with .tscn
+	if not path.ends_with(".tscn"):
+		path += ".tscn"
+	
+	# Create directory structure if it doesn't exist
+	var dir_path = path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir_path):
+		var dir = DirAccess.open("res://")
+		if dir:
+			dir.make_dir_recursive(dir_path.trim_prefix("res://"))
+	
+	# Check if file already exists
+	if FileAccess.file_exists(path):
+		return _send_error(client_id, "Scene file already exists: %s" % path, command_id)
+	
+	# Create the root node of the specified type
+	var root_node = null
+	
+	match root_node_type:
+		"Node":
+			root_node = Node.new()
+		"Node2D":
+			root_node = Node2D.new()
+		"Node3D", "Spatial":
+			root_node = Node3D.new()
+		"Control":
+			root_node = Control.new()
+		"CanvasLayer":
+			root_node = CanvasLayer.new()
+		"Panel":
+			root_node = Panel.new()
+		_:
+			# Attempt to create a custom class if built-in type not recognized
+			if ClassDB.class_exists(root_node_type):
+				root_node = ClassDB.instantiate(root_node_type)
+			else:
+				return _send_error(client_id, "Invalid root node type: %s" % root_node_type, command_id)
+	
+	# Give the root node a name based on the file name
+	var file_name = path.get_file().get_basename()
+	root_node.name = file_name
+	
+	# Create a packed scene
+	var packed_scene = PackedScene.new()
+	var result = packed_scene.pack(root_node)
+	if result != OK:
+		root_node.free()
+		return _send_error(client_id, "Failed to pack scene: %d" % result, command_id)
+	
+	# Save the packed scene to disk
+	result = ResourceSaver.save(packed_scene, path)
+	if result != OK:
+		root_node.free()
+		return _send_error(client_id, "Failed to save scene: %d" % result, command_id)
+	
+	# Clean up
+	root_node.free()
+	
+	# Try to open the scene in the editor
+	var plugin = Engine.get_meta("GodotMCPPlugin") if Engine.has_meta("GodotMCPPlugin") else null
+	if plugin and plugin.has_method("get_editor_interface"):
+		var editor_interface = plugin.get_editor_interface()
+		editor_interface.open_scene_from_path(path)
+	
+	_send_success(client_id, {
+		"scene_path": path,
+		"root_node_type": root_node_type
+	}, command_id)

@@ -120,6 +120,27 @@ Create a script template for a KinematicBody2D with process and input functions.
 
 ## Scene Tools
 
+### create_scene
+Creates a new empty scene with an optional root node type.
+
+**Parameters:**
+- `path` (string): Path where the new scene will be saved (e.g. "res://scenes/new_scene.tscn")
+- `root_node_type` (string, optional): Type of root node to create (e.g. "Node2D", "Node3D", "Control"). Defaults to "Node" if not specified
+
+**Returns:**
+- `scene_path` (string): Path where the scene was saved
+- `root_node_type` (string): The type of the root node that was created
+
+**Example:**
+```typescript
+// Create a new scene with a Node2D as root
+const result = await mcp.execute('create_scene', {
+  path: 'res://scenes/game_level.tscn',
+  root_node_type: 'Node2D'
+});
+console.log(`Created scene at ${result.scene_path}`);
+```
+
 ### save_scene
 Save the current scene to disk.
 
