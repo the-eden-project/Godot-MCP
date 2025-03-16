@@ -48,6 +48,11 @@ import { nodeTools } from './tools/node_tools.js';
 import { scriptTools } from './tools/script_tools.js';
 import { sceneTools } from './tools/scene_tools.js';
 import { getGodotConnection } from './utils/godot_connection.js';
+// Import resources
+import { sceneListResource, sceneStructureResource } from './resources/scene_resources.js';
+import { scriptResource, scriptListResource, scriptMetadataResource } from './resources/script_resources.js';
+import { projectStructureResource, projectSettingsResource, projectResourcesResource } from './resources/project_resources.js';
+import { editorStateResource, selectedNodeResource, currentScriptResource } from './resources/editor_resources.js';
 /**
  * Main entry point for the Godot MCP server
  */
@@ -66,6 +71,19 @@ function main() {
                     __spreadArray(__spreadArray(__spreadArray([], nodeTools, true), scriptTools, true), sceneTools, true).forEach(function (tool) {
                         server.addTool(tool);
                     });
+                    // Register all resources
+                    // Static resources
+                    server.addResource(sceneListResource);
+                    server.addResource(scriptListResource);
+                    server.addResource(projectStructureResource);
+                    server.addResource(projectSettingsResource);
+                    server.addResource(projectResourcesResource);
+                    server.addResource(editorStateResource);
+                    server.addResource(selectedNodeResource);
+                    server.addResource(currentScriptResource);
+                    server.addResource(sceneStructureResource);
+                    server.addResource(scriptResource);
+                    server.addResource(scriptMetadataResource);
                     _a.label = 1;
                 case 1:
                     _a.trys.push([1, 3, , 4]);
