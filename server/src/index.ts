@@ -2,6 +2,7 @@ import { FastMCP } from 'fastmcp';
 import { nodeTools } from './tools/node_tools.js';
 import { scriptTools } from './tools/script_tools.js';
 import { sceneTools } from './tools/scene_tools.js';
+import { editorTools } from './tools/editor_tools.js';
 import { getGodotConnection } from './utils/godot_connection.js';
 
 // Import resources
@@ -38,7 +39,7 @@ async function main() {
   });
 
   // Register all tools
-  [...nodeTools, ...scriptTools, ...sceneTools].forEach(tool => {
+  [...nodeTools, ...scriptTools, ...sceneTools, ...editorTools].forEach(tool => {
     server.addTool(tool);
   });
 
