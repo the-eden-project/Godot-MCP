@@ -31,9 +31,8 @@ func _execute_editor_script(client_id: int, params: Dictionary, command_id: Stri
 	# Replace print() calls with custom_print() in the user code
 	var modified_code = _replace_print_calls(code)
 	
-	# Prepare script with error handling and custom print function
-	var script_content = """
-@tool
+	# Use consistent tab indentation in the template
+	var script_content = """@tool
 extends Node
 
 # Variable to store the result
@@ -43,9 +42,19 @@ var _error_message = ""
 var _parent
 
 # Custom print function that stores output in the array
-func custom_print(value):
-	_output_array.append(str(value))
-	print(value)  # Still print to the console for debugging
+func custom_print(values):
+	# Convert array of values to a single string
+	var output_str = ""
+	if values is Array:
+		for i in range(values.size()):
+			if i > 0:
+				output_str += " "
+			output_str += str(values[i])
+	else:
+		output_str = str(values)
+		
+	_output_array.append(output_str)
+	print(output_str)  # Still print to the console for debugging
 
 func _ready():
 	_parent = get_parent()
@@ -65,10 +74,31 @@ func _execute_code():
 	return OK
 """
 	
-	# Indent the user code
-	var indented_code = ""
+	# Process the user code to ensure consistent indentation
+	# This helps prevent "mixed tabs and spaces" errors
+	var processed_lines = []
 	var lines = modified_code.split("\n")
 	for line in lines:
+		# Replace any spaces at the beginning with tabs
+		var processed_line = line
+		
+		# If line starts with spaces, replace with a tab
+		var space_count = 0
+		for i in range(line.length()):
+			if line[i] == " ":
+				space_count += 1
+			else:
+				break
+		
+		# If we found spaces at the beginning, replace with tabs
+		if space_count > 0:
+			var tabs = "\t" * (space_count / 4) # Assume 4 spaces per tab
+			processed_line = tabs + line.substr(space_count)
+			
+		processed_lines.append(processed_line)
+	
+	var indented_code = ""
+	for line in processed_lines:
 		indented_code += "\t" + line + "\n"
 	
 	script_content = script_content.replace("{user_code}", indented_code)
@@ -118,7 +148,8 @@ func _execute_code():
 # Replace print() calls with custom_print() in the user code
 func _replace_print_calls(code: String) -> String:
 	var regex = RegEx.new()
-	regex.compile("print\\s*\\((.+?)\\)")
+	# Match print statements with any content inside the parentheses
+	regex.compile("print\\s*\\(([^\\)]+)\\)")
 	
 	var result = regex.search_all(code)
 	var modified_code = code
@@ -127,9 +158,10 @@ func _replace_print_calls(code: String) -> String:
 	for i in range(result.size() - 1, -1, -1):
 		var match_obj = result[i]
 		var full_match = match_obj.get_string()
-		var arg = match_obj.get_string(1)
+		var arg_content = match_obj.get_string(1)
 		
-		var replacement = "custom_print(" + arg + ")"
+		# Create an array with all arguments
+		var replacement = "custom_print([" + arg_content + "])"
 		
 		var start = match_obj.get_start()
 		var end = match_obj.get_end()
