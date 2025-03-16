@@ -92,7 +92,10 @@ func _execute_code():
 		
 		# If we found spaces at the beginning, replace with tabs
 		if space_count > 0:
-			var tabs = "\t" * (space_count / 4) # Assume 4 spaces per tab
+			# Create tabs based on space count (e.g., 4 spaces = 1 tab)
+			var tabs = ""
+			for _i in range(space_count / 4): # Integer division
+				tabs += "\t"
 			processed_line = tabs + line.substr(space_count)
 			
 		processed_lines.append(processed_line)
