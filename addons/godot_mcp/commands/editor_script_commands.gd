@@ -135,6 +135,8 @@ func _execute_code():
 		"success": error_message.is_empty(),
 		"output": output
 	}
+
+	print("result_data: ", result_data)
 	
 	if not error_message.is_empty():
 		result_data["error"] = error_message
