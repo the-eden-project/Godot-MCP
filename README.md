@@ -1,131 +1,176 @@
-# Godot MCP Script Integration
+# Godot MCP (Model Context Protocol)
 
-This project provides an integration between Godot and the Model Context Protocol (MCP). It allows you to access the currently open script in the Godot editor via an MCP server, which can then be used by Claude or other MCP clients.
+A comprehensive integration between Godot Engine and AI assistants using the Model Context Protocol (MCP). This plugin allows AI assistants to interact with your Godot projects, providing powerful capabilities for code assistance, scene manipulation, and project management.
 
-## Getting Started
+## Features
 
-1. Clone the repository:
+- **Full Godot Project Access**: AI assistants can access and modify scripts, scenes, nodes, and project resources
+- **Two-way Communication**: Send project data to AI and apply suggested changes directly in the editor
+- **Command Categories**:
+  - **Node Commands**: Create, modify, and manage nodes in your scenes
+  - **Script Commands**: Edit, analyze, and create GDScript files
+  - **Scene Commands**: Manipulate scenes and their structure
+  - **Project Commands**: Access project settings and resources
+  - **Editor Commands**: Control various editor functionality
+
+## Quick Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/ee0pdt/godot-mcp.git
+cd godot-mcp
+```
+
+### 2. Set Up the MCP Server
+
+```bash
+cd server
+npm install
+npm run build
+# Return to project root
+cd ..
+```
+
+### 3. Set Up Claude Desktop
+
+1. Edit or create the Claude Desktop config file:
    ```bash
-   git clone https://github.com/ee0pdt/Godot-MCP.git
-   cd Godot-MCP
+   # For macOS
+   nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
    ```
 
-## Project Structure
-
-- `server/`: The TypeScript MCP server implementation
-- `addons/mcp_integration/`: The Godot editor plugin (ready to use in this project)
-
-## Setting Up the MCP Server
-
-1. Navigate to the server directory:
-   ```bash
-   cd server
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Build the server:
-   ```bash
-   npm run build
-   ```
-
-4. When used with Claude Desktop, you don't need to manually run the server - it will be started automatically. For manual testing, you can run:
-   ```bash
-   npm run start     # For HTTP mode
-   npm run stdio     # For stdio mode
-   ```
-
-## Using the Godot Plugin
-
-The plugin is already installed in the correct location in this project. To use it:
-
-1. Open this Godot project
-2. Go to Project > Project Settings > Plugins
-3. Enable the "MCP Script Integration" plugin
-
-## Connecting to Claude Desktop
-
-Configure Claude Desktop to connect to the MCP server:
-
-1. Create or edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+2. Add the following configuration (or use the included `claude_desktop_config.json` as a reference):
    ```json
    {
-     "mcpServers": {
-       "godot-script-server": {
-         "command": "node",
-         "args": [
-           "[PATH_TO_YOUR_PROJECT]/server/dist/index.js"
-         ],
-         "env": {
-           "MCP_TRANSPORT": "stdio"
-         }
-       }
-     }
+	 "mcpServers": {
+	   "godot-mcp": {
+		 "command": "node",
+		 "args": [
+		   "PATH_TO_YOUR_PROJECT/server/dist/index.js"
+		 ],
+		 "env": {
+		   "MCP_TRANSPORT": "stdio"
+		 }
+	   }
+	 }
    }
    ```
-   > **Note:** Replace `[PATH_TO_YOUR_PROJECT]` with the absolute path to where you have this project stored.
+   > **Note**: Replace `PATH_TO_YOUR_PROJECT` with the absolute path to where you have this repository stored.
 
-2. Restart Claude Desktop
+3. Restart Claude Desktop
+
+### 4. Open the Example Project in Godot
+
+1. Open Godot Engine
+2. Select "Import" and navigate to the cloned repository
+3. Open the `project.godot` file
+4. The MCP plugin is already enabled in this example project
 
 ## Using MCP with Claude
 
-Once configured, you can use commands in Claude to interact with your Godot scripts:
+After setup, you can work with your Godot project directly from Claude using natural language. Here are some examples:
 
-1. **View the current script**:
-   ```
-   @mcp godot-script-server read godot://script/current
-   ```
+### Example Prompts
 
-2. **Request script updates** (useful if you've made changes):
-   ```
-   @mcp godot-script-server run update-current-script
-   ```
+```
+@mcp godot-mcp read godot://script/current
 
-3. **List all scripts in your project**:
-   ```
-   @mcp godot-script-server run list-project-scripts
-   ```
+I need help optimizing my player movement code. Can you suggest improvements?
+```
 
-4. **Get help with your code**:
-   ```
-   @mcp godot-script-server read godot://script/current
-   
-   Can you help me optimize this code? I'm particularly concerned about the performance in the _process function.
-   ```
+```
+@mcp godot-mcp run get-scene-tree
 
-## Available MCP Resources and Tools
+Add a cube in the middle of the scene and then make a camera that is looking at the cube.
+```
 
-### Resources:
-- `godot://script/current` - The currently open script in the Godot editor
+```
+@mcp godot-mcp read godot://scene/current
 
-### Tools:
-- `update-current-script` - Updates info about the currently open script
-- `list-project-scripts` - Lists all script files in a project directory
-- `read-script` - Reads the content of a specific script
+Create an enemy AI that patrols between waypoints and attacks the player when in range.
+```
+
+### Natural Language Tasks Claude Can Perform
+
+- "Create a main menu with play, options, and quit buttons"
+- "Add collision detection to the player character"
+- "Implement a day/night cycle system"
+- "Refactor this code to use signals instead of direct references"
+- "Debug why my player character falls through the floor sometimes"
+
+## Available Resources and Commands
+
+### Resource Endpoints:
+- `godot://script/current` - The currently open script
+- `godot://scene/current` - The currently open scene
+- `godot://project/info` - Project metadata and settings
+
+### Command Categories:
+
+#### Node Commands
+- `get-scene-tree` - Returns the scene tree structure
+- `get-node-properties` - Gets properties of a specific node
+- `create-node` - Creates a new node
+- `delete-node` - Deletes a node
+- `modify-node` - Updates node properties
+
+#### Script Commands
+- `list-project-scripts` - Lists all scripts in the project
+- `read-script` - Reads a specific script
+- `modify-script` - Updates script content
+- `create-script` - Creates a new script
+- `analyze-script` - Provides analysis of a script
+
+#### Scene Commands
+- `list-project-scenes` - Lists all scenes in the project
+- `read-scene` - Reads scene structure
+- `create-scene` - Creates a new scene
+- `save-scene` - Saves current scene
+
+#### Project Commands
+- `get-project-settings` - Gets project settings
+- `list-project-resources` - Lists project resources
+
+#### Editor Commands
+- `get-editor-state` - Gets current editor state
+- `run-project` - Runs the project
+- `stop-project` - Stops the running project
 
 ## Troubleshooting
 
-### EADDRINUSE Error
+### Connection Issues
+- Ensure the plugin is enabled in Godot's Project Settings
+- Check the Godot console for any error messages
+- Verify the server is running when Claude Desktop launches it
 
-If you see an error like `Error: listen EADDRINUSE: address already in use :::3000` in the logs:
 
-1. This is normal when Claude Desktop launches two instances of the server
-2. The server will continue to function properly using stdio communication
-3. Only the HTTP server portion will fail, which isn't needed for Claude Desktop
+### Plugin Not Working
+- Reload Godot project after any configuration changes
+- Check for error messages in the Godot console
+- Make sure all paths in your Claude Desktop config are absolute and correct
 
-If you need to run the HTTP server manually:
+## Adding the Plugin to Your Own Godot Project
 
-1. Make sure no other services are using port 3000
-2. Alternatively, specify a different port: `PORT=3001 npm run start`
+If you want to use the MCP plugin in your own Godot project:
 
-### Other Common Issues
+1. Copy the `addons/godot_mcp` folder to your Godot project's `addons` directory
+2. Open your project in Godot
+3. Go to Project > Project Settings > Plugins
+4. Enable the "Godot MCP" plugin
 
-- If the plugin isn't seeing script changes, try restarting Godot
-- Check the Godot console for any error messages from the plugin
-- Check the server's console output for any connection issues
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Documentation
+
+For more detailed information, check the documentation in the `docs` folder:
+
+- [Getting Started](docs/getting-started.md)
+- [Installation Guide](docs/installation-guide.md)
+- [Command Reference](docs/command-reference.md)
+- [Architecture](docs/architecture.md)
 
 ## License
 
