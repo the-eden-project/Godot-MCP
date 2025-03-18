@@ -43,17 +43,17 @@ cd ..
 2. Add the following configuration (or use the included `claude_desktop_config.json` as a reference):
    ```json
    {
-     "mcpServers": {
-       "godot-mcp": {
-         "command": "node",
-         "args": [
-           "PATH_TO_YOUR_PROJECT/server/dist/index.js"
-         ],
-         "env": {
-           "MCP_TRANSPORT": "stdio"
-         }
-       }
-     }
+	 "mcpServers": {
+	   "godot-mcp": {
+		 "command": "node",
+		 "args": [
+		   "PATH_TO_YOUR_PROJECT/server/dist/index.js"
+		 ],
+		 "env": {
+		   "MCP_TRANSPORT": "stdio"
+		 }
+	   }
+	 }
    }
    ```
    > **Note**: Replace `PATH_TO_YOUR_PROJECT` with the absolute path to where you have this repository stored.
