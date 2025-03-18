@@ -35,6 +35,8 @@ func _execute_editor_script(client_id: int, params: Dictionary, command_id: Stri
 	var script_content = """@tool
 extends Node
 
+signal execution_completed
+
 # Variable to store the result
 var result = null
 var _output_array = []
@@ -56,7 +58,8 @@ func custom_print(values):
 	_output_array.append(output_str)
 	print(output_str)  # Still print to the console for debugging
 
-func _ready():
+func run():
+	print("Executing script... ready func")
 	_parent = get_parent()
 	var scene = get_tree().edited_scene_root
 	
@@ -66,6 +69,9 @@ func _ready():
 	# If there was an error, store it
 	if err != OK:
 		_error_message = "Failed to execute script with error: " + str(err)
+	
+	# Signal that execution is complete
+	execution_completed.emit()
 
 func _execute_code():
 	# USER CODE START
@@ -117,14 +123,18 @@ func _execute_code():
 	# Assign the script to the node
 	script_node.set_script(script)
 	
-	# Wait a few frames to ensure the script has executed
-	await get_tree().process_frame
-	await get_tree().process_frame
-	
+	# Connect to the execution_completed signal
+	script_node.connect("execution_completed", _on_script_execution_completed.bind(script_node, client_id, command_id))
+
+	script_node.run()
+
+
+# Signal handler for when script execution completes
+func _on_script_execution_completed(script_node: Node, client_id: int, command_id: String) -> void:
 	# Collect results safely by checking if properties exist
-	execution_result = script_node.get("result")
-	output = script_node._output_array
-	error_message = script_node._error_message
+	var execution_result = script_node.get("result")
+	var output = script_node._output_array
+	var error_message = script_node._error_message
 	
 	# Clean up
 	remove_child(script_node)

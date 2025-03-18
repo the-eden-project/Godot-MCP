@@ -2,6 +2,9 @@
 class_name MCPBaseCommandProcessor
 extends Node
 
+# Signal emitted when a command has completed processing
+signal command_completed(client_id, command_type, result, command_id)
+
 # Reference to the server - passed by the command handler
 var _websocket_server = null
 
@@ -20,7 +23,12 @@ func _send_success(client_id: int, result: Dictionary, command_id: String) -> vo
 	if not command_id.is_empty():
 		response["commandId"] = command_id
 	
-	_websocket_server.send_response(client_id, response)
+	# Emit the signal for local processing (useful for testing)
+	command_completed.emit(client_id, "success", result, command_id)
+	
+	# Send to websocket if available
+	if _websocket_server:
+		_websocket_server.send_response(client_id, response)
 
 func _send_error(client_id: int, message: String, command_id: String) -> void:
 	var response = {
@@ -31,7 +39,13 @@ func _send_error(client_id: int, message: String, command_id: String) -> void:
 	if not command_id.is_empty():
 		response["commandId"] = command_id
 	
-	_websocket_server.send_response(client_id, response)
+	# Emit the signal for local processing (useful for testing)
+	var error_result = {"error": message}
+	command_completed.emit(client_id, "error", error_result, command_id)
+	
+	# Send to websocket if available
+	if _websocket_server:
+		_websocket_server.send_response(client_id, response)
 	print("Error: %s" % message)
 
 # Common utility methods

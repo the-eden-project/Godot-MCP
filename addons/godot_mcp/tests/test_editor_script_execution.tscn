@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dpbw5yal7ixbm"]
+
+[ext_resource type="Script" uid="uid://ddsy3yj42uf3k" path="res://addons/godot_mcp/tests/test_editor_script_execution.gd" id="1_od1cp"]
+
+[node name="TestEditorScriptExecution" type="Node"]
+script = ExtResource("1_od1cp")
