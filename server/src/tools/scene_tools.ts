@@ -118,6 +118,7 @@ export const sceneTools: MCPTool[] = [
         
         let output = `Project Name: ${result.project_name}\n`;
         output += `Project Version: ${result.project_version}\n`;
+        output += `Project Path: ${result.project_path}\n`;
         output += `Godot Version: ${godotVersion}\n`;
         
         if (result.current_scene) {

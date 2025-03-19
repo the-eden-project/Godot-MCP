@@ -24,6 +24,7 @@ func process_command(client_id: int, command_type: String, params: Dictionary, c
 func _get_project_info(client_id: int, _params: Dictionary, command_id: String) -> void:
 	var project_name = ProjectSettings.get_setting("application/config/name", "Untitled Project")
 	var project_version = ProjectSettings.get_setting("application/config/version", "1.0.0")
+	var project_path = ProjectSettings.globalize_path("res://")
 	
 	# Get Godot version info and structure it as expected by the server
 	var version_info = Engine.get_version_info()
@@ -39,6 +40,7 @@ func _get_project_info(client_id: int, _params: Dictionary, command_id: String) 
 	_send_success(client_id, {
 		"project_name": project_name,
 		"project_version": project_version,
+		"project_path": project_path,
 		"godot_version": structured_version,
 		"current_scene": get_tree().edited_scene_root.scene_file_path if get_tree().edited_scene_root else ""
 	}, command_id)
