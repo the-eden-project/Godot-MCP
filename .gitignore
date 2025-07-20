@@ -21,6 +21,28 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.template
+
+# IDE
+.vscode/
+.idea/
+
+# TypeScript build
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Test coverage
+coverage/
+.nyc_output/
+
 # Build artifacts
 *.o
 *.os
